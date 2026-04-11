@@ -32,7 +32,7 @@ function resize() {
 resize();
 window.addEventListener('resize', resize);
 
-const G = 2000;
+const G = 800;
 const THRUST_POWER = 40;
 const MIN_ORBIT_RADIUS = 80;
 
@@ -189,37 +189,6 @@ function transitionToNextLevel() {
         x: ship.orbiting.x,
         y: ship.orbiting.y,
     } : null;
-
-    const body = ship.orbiting;
-    const dx = ship.x - body.x;
-    const dy = ship.y - body.y;
-    const currentDist = Math.sqrt(dx * dx + dy * dy);
-    const vx = ship.vx;
-    const vy = ship.vy;
-    const speedSq = vx * vx + vy * vy;
-    
-    const rx = dx / currentDist;
-    const ry = dy / currentDist;
-    
-    const h = dx * vy - dy * vx;
-    const eVecX = (vy * h) / (G * body.mass) - rx;
-    const eVecY = (-vx * h) / (G * body.mass) - ry;
-    const e = Math.sqrt(eVecX * eVecX + eVecY * eVecY);
-    
-    const a = (G * body.mass) / (2 * (G * body.mass) / currentDist - speedSq);
-
-    console.log(`a: ${a.toFixed(2)}, e: ${e.toFixed(2)}`);
-    
-    if (a > 0 && e > 0.05 && e < 0.95) {
-        const perigeeDist = a * (1 - e);
-        
-        perigeePos = {
-            x: body.x + (perigeeDist * eVecX / e),
-            y: body.y - (perigeeDist * eVecY / e)
-        };
-    } else {
-        perigeePos = null;
-    }
 }
      
 function getGravity(pos, body) {
