@@ -259,7 +259,7 @@ function update(dt) {
             );
             const circularSpeed = Math.sqrt(G * body.mass / orbitDist);
             const currentSpeed = Math.sqrt(ship.vx * ship.vx + ship.vy * ship.vy);
-            if (currentSpeed > circularSpeed){
+            if (currentSpeed > circularSpeed) {
                 ship.vx -= (ship.vx / currentSpeed) * THRUST_POWER * dt;
                 ship.vy -= (ship.vy / currentSpeed) * THRUST_POWER * dt;
                 return;
@@ -292,7 +292,10 @@ function update(dt) {
     if (ship.trail.length > 60) ship.trail.shift();
     ship.trail.forEach(p => p.alpha -= dt * 1.5);
     
-    if (distToTarget < distToStart && !sliding) {
+    if(distToStart < Math.pow(planets.at(-2).radius, 2)) {
+        gameOver = true;
+        gameOverTime = 0;
+    } else if (distToTarget < distToStart && !sliding) {
         transitionToNextLevel();
     } else if (distToTarget > distToStart) {
         ship.orbiting = planets.at(-2);
