@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Orbital Transfer</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #0a0a12;
+            touch-action: none;
+        }
+        canvas {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<script>
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+
+let W, H;
+function resize() {
+    W = canvas.width = window.innerWidth;
+    H = canvas.height = window.innerHeight;
+}
+resize();
+window.addEventListener('resize', resize);
+
+const G = 2000;
+const THRUST_POWER = 40;
+const MIN_ORBIT_RADIUS = 80;
+const CAPTURE_RADIUS = 180;
+
+const planetStart = { x: 0, y: 0, radius: 60, mass: 5000, color: '#00e5ff' };
+const planetTarget = { x: 0, y: 0, radius: 55, mass: 4500, color: '#ff6b35' };
+
+let stars = [];
+function generateStars() {
+    stars = [];
+    for (let i = 0; i < 200; i++) {
+        stars.push({
+            x: Math.random() * W,
+            y: Math.random() * H,
+            size: Math.random() * 1.5 + 0.5,
+            alpha: Math.random() * 0.5 + 0.3
+        });
+    }
+}
+generateStars();
+
+function initPlanets() {
+    planetStart.x = W * 0.25;
+    planetStart.y = H * 0.5;
+    planetTarget.x = W * 0.75;
+    planetTarget.y = H * 0.5;
+}
+initPlanets();
+window.addEventListener('resize', () => { initPlanets(); generateStars(); repositionShip(); });
+
+function repositionShip() {
+    const dx = ship.x - planetStart.x;
+    const dy = ship.y - planetStart.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const angle = Math.atan2(dy, dx);
+    const newDist = Math.max(MIN_ORBIT_RADIUS + 30, dist);
+    ship.x = planetStart.x + Math.cos(angle) * newDist;
+    ship.y = planetStart.y + Math.sin(angle) * newDist;
+}
+
+let ship = {
+    x: 0, y: 0,
+    vx: 0, vy: 0,
+    orbiting: planetStart,
+    trail: [],
+    thrusting: false
+};
+
+function initShip() {
+    const orbitRadius = MIN_ORBIT_RADIUS + 30;
+    ship.x = planetStart.x + orbitRadius;
+    ship.y = planetStart.y;
+    const orbitalSpeed = Math.sqrt(G * planetStart.mass / orbitRadius);
+    ship.vx = 0;
+    ship.vy = -orbitalSpeed;
+    ship.orbiting = planetStart;
+    ship.trail = [];
+    ship.thrusting = false;
+}
+initShip();
+
+let captured = false;
+let level = 1;
+let time = 0;
+let gameOver = false;
+let gameOverTime = 0;
+let offsetX = 0;
+let offsetY = 0;
+let sliding = false;
+let slideProgress = 0;
+let slideStartX = 0;
+let slideStartY = 0;
+let slideTargetX = 0;
+let slideTargetY = 0;
+let willCircularize = true;
+let perigeePos = null;
+
+function generateRandomPlanet(refX) {
+    const colors = ['#ff6b35', '#7b2cbf', '#2ec4b6', '#e71d36', '#ff9f1c', '#7209b7', '#06d6a0', '#ffd166'];
+    const radius = 35 + Math.random() * 30;
+    const mass = radius * 80;
+    return {
+        x: refX + W * 0.25 + Math.random() * W * 0.35,
+        y: H * 0.2 + Math.random() * H * 0.6,
+        radius: radius,
+        mass: mass,
+        color: colors[Math.floor(Math.random() * colors.length)]
+    };
+}
+
+function transitionToNextLevel() {
+    const oldTargetPos = { x: planetTarget.x, y: planetTarget.y };
+    const oldStartPos = { x: planetStart.x, y: planetStart.y };
+    
+    const target = generateRandomPlanet(oldTargetPos.x);
+    
+    const newTargetX = target.x;
+    const newTargetY = target.y;
+    
+    const newStartX = oldTargetPos.x;
+    const newStartY = oldTargetPos.y;
+    
+    planetStart.x = newStartX;
+    planetStart.y = newStartY;
+    planetStart.radius = planetTarget.radius;
+    planetStart.mass = planetTarget.mass;
+    planetStart.color = planetTarget.color;
+    
+    planetTarget.x = newTargetX;
+    planetTarget.y = newTargetY;
+    planetTarget.radius = target.radius;
+    planetTarget.mass = target.mass;
+    planetTarget.color = target.color;
+    
+    ship.orbiting = planetStart;
+    ship.x = planetStart.x + (ship.x - oldTargetPos.x);
+    ship.y = planetStart.y + (ship.y - oldTargetPos.y);
+    
+    slideStartX = offsetX;
+    slideStartY = offsetY;
+    slideTargetX = oldStartPos.x - newStartX;
+    slideTargetY = oldStartPos.y - newStartY;
+    slideProgress = 0;
+    sliding = true;
+    
+    captured = false;
+    level++;
+    willCircularize = true;
+}
+     
+function getGravity(pos, body) {
+    const dx = body.x - pos.x;
+    const dy = body.y - pos.y;
+    const distSq = dx * dx + dy * dy;
+    const dist = Math.sqrt(distSq);
+    const force = G * body.mass / distSq;
+    return { ax: force * dx / dist, ay: force * dy / dist, dist };
+}
+
+function worldToScreen(x, y) {
+    return { x: x + offsetX, y: y + offsetY };
+}
+
+function update(dt) {
+    if (sliding) {
+        slideProgress += dt * 3;
+        if (slideProgress >= 1) {
+            slideProgress = 1;
+            sliding = false;
+        }
+        const t = slideProgress;
+        const ease = t * (2 - t);
+        offsetX = slideStartX + (slideTargetX - slideStartX) * ease;
+        offsetY = slideStartY + (slideTargetY - slideStartY) * ease;
+        
+        time += dt;
+        return;
+    }
+    
+    if (captured) {
+        time += dt;
+        return;
+    }
+    
+    if (gameOver) {
+        gameOverTime += dt;
+        return;
+    }
+    
+    time += dt;
+    
+    if (ship.thrusting) {
+        willCircularize = false;
+        perigeePos = null;
+        
+        const speed = Math.sqrt(ship.vx * ship.vx + ship.vy * ship.vy);
+        if (speed > 0) {
+            ship.vx += (ship.vx / speed) * THRUST_POWER * dt;
+            ship.vy += (ship.vy / speed) * THRUST_POWER * dt;
+        }
+        
+        ship.trail.push({ x: ship.x, y: ship.y, alpha: 1 });
+        if (ship.trail.length > 60) ship.trail.shift();
+        ship.trail.forEach(p => p.alpha -= dt * 1.5);
+        
+        return;
+    }
+    
+    if (willCircularize && !perigeePos) {
+        const body = ship.orbiting;
+        const dx = ship.x - body.x;
+        const dy = ship.y - body.y;
+        const currentDist = Math.sqrt(dx * dx + dy * dy);
+        const vx = ship.vx;
+        const vy = ship.vy;
+        const speedSq = vx * vx + vy * vy;
+        
+        const rx = dx / currentDist;
+        const ry = dy / currentDist;
+        
+        const h = dx * vy - dy * vx;
+        const eVecX = (vy * h) / (G * body.mass) - rx;
+        const eVecY = (-vx * h) / (G * body.mass) - ry;
+        const e = Math.sqrt(eVecX * eVecX + eVecY * eVecY);
+        
+        const a = (G * body.mass) / (2 * (G * body.mass) / currentDist - speedSq);
+        
+        if (a > 0 && e > 0.05 && e < 0.95) {
+            const perigeeDist = a * (1 - e);
+            
+            perigeePos = {
+                x: body.x - (perigeeDist * eVecX / e),
+                y: body.y - (perigeeDist * eVecY / e)
+            };
+        } else {
+            perigeePos = null;
+        }
+    }
+    
+    const body = ship.orbiting;
+    const grav = getGravity(ship, body);
+    ship.vx += grav.ax * dt;
+    ship.vy += grav.ay * dt;
+    
+    ship.x += ship.vx * dt;
+    ship.y += ship.vy * dt;
+    
+    const distToStart = Math.sqrt(
+        Math.pow(ship.x - planetStart.x, 2) + 
+        Math.pow(ship.y - planetStart.y, 2)
+    );
+    const distToTarget = Math.sqrt(
+        Math.pow(ship.x - planetTarget.x, 2) + 
+        Math.pow(ship.y - planetTarget.y, 2)
+    );
+    
+    if (distToTarget < distToStart) {
+        ship.orbiting = planetTarget;
+    } else {
+        ship.orbiting = planetStart;
+    }
+    
+    if (perigeePos && willCircularize) {
+        const distToPerigee = Math.sqrt(
+            Math.pow(ship.x - perigeePos.x, 2) + 
+            Math.pow(ship.y - perigeePos.y, 2)
+        );
+        if (distToPerigee < 15) {
+            const orbitDist = Math.sqrt(
+                Math.pow(ship.x - body.x, 2) + 
+                Math.pow(ship.y - body.y, 2)
+            );
+            const circularSpeed = Math.sqrt(G * body.mass / orbitDist);
+            const currentSpeed = Math.sqrt(ship.vx * ship.vx + ship.vy * ship.vy);
+            const scale = circularSpeed / currentSpeed;
+            ship.vx *= scale;
+            ship.vy *= scale;
+            willCircularize = false;
+            perigeePos = null;
+        }
+    }
+    
+    ship.trail.push({ x: ship.x, y: ship.y, alpha: 1 });
+    if (ship.trail.length > 60) ship.trail.shift();
+    ship.trail.forEach(p => p.alpha -= dt * 1.5);
+    
+    const targetDist = Math.sqrt(
+        Math.pow(ship.x - planetTarget.x, 2) + 
+        Math.pow(ship.y - planetTarget.y, 2)
+    );
+    if (targetDist < CAPTURE_RADIUS && !captured && !sliding && distToStart > CAPTURE_RADIUS) {
+        captured = true;
+        setTimeout(() => {
+            if (captured) {
+                transitionToNextLevel();
+            }
+        }, 700);
+    } else if (distToStart < CAPTURE_RADIUS && distToTarget > CAPTURE_RADIUS && ship.orbiting !== planetStart && !captured && !sliding) {
+        ship.orbiting = planetStart;
+    }
+    
+    if (!gameOver && !captured && !sliding) {
+        const screenPos = worldToScreen(ship.x, ship.y);
+        if (screenPos.x < -100 || screenPos.x > W + 100 || screenPos.y < -100 || screenPos.y > H + 100) {
+            gameOver = true;
+            gameOverTime = 0;
+        }
+    }
+}
+
+function drawGlow(x, y, radius, color, intensity = 1) {
+    const gradient = ctx.createRadialGradient(x, y, 0, x, y, radius * 2);
+    gradient.addColorStop(0, color);
+    gradient.addColorStop(0.4, color + '80');
+    gradient.addColorStop(1, 'transparent');
+    ctx.fillStyle = gradient;
+    ctx.globalAlpha = intensity;
+    ctx.beginPath();
+    ctx.arc(x, y, radius * 2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+}
+
+function drawPlanet(body) {
+    const pos = worldToScreen(body.x, body.y);
+    const pulse = Math.sin(time * 2) * 0.1 + 1;
+    
+    ctx.save();
+    ctx.shadowColor = body.color;
+    ctx.shadowBlur = 40 * pulse;
+    
+    const grad = ctx.createRadialGradient(pos.x - body.radius * 0.3, pos.y - body.radius * 0.3, 0, pos.x, pos.y, body.radius);
+    grad.addColorStop(0, body.color + 'ff');
+    grad.addColorStop(0.7, body.color + 'aa');
+    grad.addColorStop(1, body.color + '44');
+    
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(pos.x, pos.y, body.radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    
+    drawGlow(pos.x, pos.y, body.radius, body.color, 0.3);
+}
+
+function drawOrbitPath() {
+    const body = ship.orbiting;
+    if (!body) return;
+    
+    const dx = ship.x - body.x;
+    const dy = ship.y - body.y;
+    const currentDist = Math.sqrt(dx * dx + dy * dy);
+    const vx = ship.vx;
+    const vy = ship.vy;
+    const speedSq = vx * vx + vy * vy;
+    
+    const rx = dx / currentDist;
+    const ry = dy / currentDist;
+    
+    const h = dx * vy - dy * vx;
+    const eVecX = (vy * h) / (G * body.mass) - rx;
+    const eVecY = (-vx * h) / (G * body.mass) - ry;
+    const e = Math.sqrt(eVecX * eVecX + eVecY * eVecY);
+    
+    const a = (G * body.mass) / (2 * (G * body.mass) / currentDist - speedSq);
+    
+    if (a > 0 && e < 1 && e > 0.01) {
+        const cx = body.x - a * eVecX;
+        const cy = body.y - a * eVecY;
+        const b = a * Math.sqrt(1 - e * e);
+        
+        const angle = Math.atan2(eVecY, eVecX);
+        
+        const centerPos = worldToScreen(cx, cy);
+        
+        ctx.strokeStyle = body.color + '40';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([8, 8]);
+        ctx.beginPath();
+        ctx.ellipse(centerPos.x, centerPos.y, a, b, angle, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+    } else {
+        const bodyPos = worldToScreen(body.x, body.y);
+        ctx.strokeStyle = body.color + '25';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([8, 8]);
+        ctx.beginPath();
+        ctx.arc(bodyPos.x, bodyPos.y, currentDist, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+    }
+    
+    if (ship.thrusting && ship.orbiting === planetStart) {
+        const currentSpeed = Math.sqrt(ship.vx * ship.vx + ship.vy * ship.vy);
+        const thrustDirX = ship.vx / currentSpeed;
+        const thrustDirY = ship.vy / currentSpeed;
+        
+        const vxNew = ship.vx + thrustDirX * 3;
+        const vyNew = ship.vy + thrustDirY * 3;
+        
+        const h = dx * vyNew - dy * vxNew;
+        const eVecX = (vyNew * h) / (G * body.mass) - rx;
+        const eVecY = (-vxNew * h) / (G * body.mass) - ry;
+        const e = Math.sqrt(eVecX * eVecX + eVecY * eVecY);
+        
+        const speedSq = vxNew * vxNew + vyNew * vyNew;
+        const a = (G * body.mass) / (2 * (G * body.mass) / currentDist - speedSq);
+        
+        if (a > 0 && e < 1 && e > 0.01) {
+            const cx = body.x - a * eVecX;
+            const cy = body.y - a * eVecY;
+            const b = a * Math.sqrt(1 - e * e);
+            
+            const angle = Math.atan2(eVecY, eVecX);
+            const centerPos = worldToScreen(cx, cy);
+            
+            ctx.strokeStyle = body.color + '60';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([4, 4]);
+            ctx.beginPath();
+            ctx.ellipse(centerPos.x, centerPos.y, a, b, angle, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+    }
+}
+
+function drawShipTrail() {
+    ship.trail.forEach((p, i) => {
+        if (p.alpha <= 0) return;
+        const pos = worldToScreen(p.x, p.y);
+        ctx.globalAlpha = p.alpha * 0.6;
+        ctx.fillStyle = '#00ffff';
+        ctx.beginPath();
+        ctx.arc(pos.x, pos.y, 2, 0, Math.PI * 2);
+        ctx.fill();
+    });
+    ctx.globalAlpha = 1;
+}
+
+function drawShip() {
+    const pos = worldToScreen(ship.x, ship.y);
+    const speed = Math.sqrt(ship.vx * ship.vx + ship.vy * ship.vy);
+    const angle = Math.atan2(ship.vy, ship.vx);
+    
+    ctx.save();
+    ctx.translate(pos.x, pos.y);
+    ctx.rotate(angle);
+    
+    if (ship.thrusting) {
+        ctx.shadowColor = '#ff6600';
+        ctx.shadowBlur = 20;
+        
+        const flameGrad = ctx.createLinearGradient(-20, 0, -8, 0);
+        flameGrad.addColorStop(0, 'transparent');
+        flameGrad.addColorStop(1, '#ff6600');
+        ctx.fillStyle = flameGrad;
+        ctx.beginPath();
+        ctx.moveTo(-6, -4);
+        ctx.lineTo(-18 - Math.random() * 8, 0);
+        ctx.lineTo(-6, 4);
+        ctx.closePath();
+        ctx.fill();
+    }
+    
+    ctx.shadowColor = ship.thrusting ? '#ff6600' : '#00ffff';
+    ctx.shadowBlur = ship.thrusting ? 15 : 10;
+    
+    ctx.fillStyle = ship.thrusting ? '#ffaa00' : '#ffffff';
+    ctx.beginPath();
+    ctx.moveTo(8, 0);
+    ctx.lineTo(-6, -5);
+    ctx.lineTo(-4, 0);
+    ctx.lineTo(-6, 5);
+    ctx.closePath();
+    ctx.fill();
+    
+    ctx.restore();
+}
+
+function drawPerigee() {
+    if (!perigeePos || !willCircularize) return;
+    
+    const pos = worldToScreen(perigeePos.x, perigeePos.y);
+    const pulse = Math.sin(time * 5) * 0.3 + 0.7;
+    
+    ctx.fillStyle = '#ffff00';
+    ctx.globalAlpha = pulse;
+    ctx.beginPath();
+    ctx.arc(pos.x, pos.y, 6, 0, Math.PI * 2);
+    ctx.fill();
+    
+    ctx.strokeStyle = '#ffff00';
+    ctx.lineWidth = 2;
+    ctx.globalAlpha = pulse * 0.5;
+    ctx.beginPath();
+    ctx.arc(pos.x, pos.y, 12, 0, Math.PI * 2);
+    ctx.stroke();
+    
+    ctx.globalAlpha = 1;
+}
+
+function drawStars() {
+    stars.forEach(s => {
+        ctx.globalAlpha = s.alpha;
+        ctx.fillStyle = '#ffffff';
+        const x = (s.x - offsetX * 0.1 + W * 2) % W;
+        const y = (s.y - offsetY * 0.1 + H * 2) % H;
+        ctx.beginPath();
+        ctx.arc(x, y, s.size, 0, Math.PI * 2);
+        ctx.fill();
+    });
+    ctx.globalAlpha = 1;
+}
+
+function drawUI() {
+    ctx.font = '14px "Courier New", monospace';
+    ctx.fillStyle = '#00e5ff';
+    ctx.textAlign = 'left';
+    
+    const currentPlanet = !captured ? ship.orbiting : planetTarget;
+    const dist = Math.sqrt(
+        Math.pow(ship.x - currentPlanet.x, 2) + 
+        Math.pow(ship.y - currentPlanet.y, 2)
+    );
+    
+    if (!captured) {
+        ctx.fillText(`ALT: ${Math.round(dist - MIN_ORBIT_RADIUS)}`, 20, 30);
+        ctx.fillText(`LEVEL ${level}`, 20, 50);
+        
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#ffffff';
+        ctx.globalAlpha = 0.7 + Math.sin(time * 3) * 0.3;
+        ctx.fillText('HOLD TO RAISE ORBIT', W / 2, H - 40);
+        ctx.globalAlpha = 1;
+    } else {
+        ctx.fillText(`LEVEL ${level}`, 20, 30);
+    }
+}
+
+function drawWinMessage() {
+    ctx.fillStyle = '#ff6b35';
+    ctx.font = 'bold 36px "Courier New", monospace';
+    ctx.textAlign = 'center';
+    ctx.shadowColor = '#ff6b35';
+    ctx.shadowBlur = 20;
+    ctx.fillText('ORBIT ESTABLISHED!', W / 2, H / 2 - 20);
+    ctx.shadowBlur = 0;
+    
+    ctx.font = '18px "Courier New", monospace';
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(`Level ${level}`, W / 2, H / 2 + 25);
+}
+
+function drawGameOver() {
+    ctx.fillStyle = '#ff3535';
+    ctx.font = 'bold 36px "Courier New", monospace';
+    ctx.textAlign = 'center';
+    ctx.shadowColor = '#ff3535';
+    ctx.shadowBlur = 20;
+    ctx.fillText('LOST IN SPACE', W / 2, H / 2 - 20);
+    ctx.shadowBlur = 0;
+    
+    ctx.font = '18px "Courier New", monospace';
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(`Reached Level ${level}`, W / 2, H / 2 + 25);
+    
+    if (gameOverTime > 2) {
+        resetGame();
+    }
+}
+
+function resetGame() {
+    initPlanets();
+    initShip();
+    level = 1;
+    captured = false;
+    gameOver = false;
+    gameOverTime = 0;
+    offsetX = 0;
+    offsetY = 0;
+    sliding = false;
+    slideProgress = 0;
+    willCircularize = true;
+    perigeePos = null;
+}
+
+let lastTime = 0;
+let dt = 0.016;
+function gameLoop(timestamp) {
+    dt = Math.min((timestamp - lastTime) / 1000, 0.05);
+    lastTime = timestamp;
+    
+    ctx.fillStyle = '#0a0a12';
+    ctx.fillRect(0, 0, W, H);
+    
+    drawStars();
+    drawOrbitPath();
+    drawPlanet(planetStart);
+    drawPlanet(planetTarget);
+    drawShipTrail();
+    drawShip();
+    drawPerigee();
+    drawUI();
+    
+    if (gameOver) {
+        drawGameOver();
+    }
+    
+    update(dt);
+    requestAnimationFrame(gameLoop);
+}
+
+function handleStart(e) {
+    e.preventDefault();
+    ship.thrusting = true;
+}
+
+function handleEnd(e) {
+    e.preventDefault();
+    ship.thrusting = false;
+}
+
+canvas.addEventListener('mousedown', handleStart);
+canvas.addEventListener('mouseup', handleEnd);
+canvas.addEventListener('mouseleave', handleEnd);
+canvas.addEventListener('touchstart', handleStart, { passive: false });
+canvas.addEventListener('touchend', handleEnd, { passive: false });
+canvas.addEventListener('touchcancel', handleEnd, { passive: false });
+
+requestAnimationFrame(gameLoop);
+</script>
+</body>
+</html>
