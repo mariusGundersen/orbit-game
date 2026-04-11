@@ -377,6 +377,8 @@ function drawOrbitPath() {
     
     const a = (G * body.mass) / (2 * (G * body.mass) / currentDist - speedSq);
     
+    const bodyPos = worldToScreen(body.x, body.y);
+    
     if (a > 0 && e < 1 && e > 0.01) {
         if(perigeePos){
             const perigeeDist = a * (1 - e);
@@ -393,17 +395,46 @@ function drawOrbitPath() {
         
         const centerPos = worldToScreen(cx, cy);
         
-        ctx.strokeStyle = body.color + '40';
+        ctx.strokeStyle = body.color + '80';
         ctx.lineWidth = 2;
         ctx.setLineDash([8, 8]);
         ctx.beginPath();
         ctx.ellipse(centerPos.x, centerPos.y, a, b, angle, 0, Math.PI * 2);
         ctx.stroke();
         ctx.setLineDash([]);
+    } else if (e >= 1) {
+        ctx.strokeStyle = body.color + '80';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([4, 4]);
+        
+        const cx = body.x - a * eVecX;
+        const cy = body.y - a * eVecY;
+        const angle = Math.atan2(eVecY, eVecX);
+        const centerPos = worldToScreen(cx, cy);
+        
+        ctx.beginPath();
+        const semiMajor = Math.abs(a);
+        let move = true;
+        for (let i = -10; i <= 10; i++) {
+            const t = i * 0.2;
+            const r = semiMajor * (e * e - 1) / (1 + e * Math.cos(t));
+            const px = bodyPos.x + r * Math.cos(t + angle);
+            const py = bodyPos.y + r * Math.sin(t + angle);
+            if(px < -100 || px > W + 100 || py < -100 || py > H + 100) continue;
+            if (move) {
+                ctx.moveTo(px, py);
+                move = false;
+            } else {
+                ctx.lineTo(px, py);
+            }
+        }
+        ctx.stroke();
+        ctx.setLineDash([]);
+        
+        perigeePos = null;
     } else {
-        const bodyPos = worldToScreen(body.x, body.y);
-        ctx.strokeStyle = body.color + '25';
-        ctx.lineWidth = 1;
+        ctx.strokeStyle = body.color + '80';
+        ctx.lineWidth = 2;
         ctx.setLineDash([8, 8]);
         ctx.beginPath();
         ctx.arc(bodyPos.x, bodyPos.y, currentDist, 0, Math.PI * 2);
@@ -411,8 +442,6 @@ function drawOrbitPath() {
         ctx.setLineDash([]);
         perigeePos = null;
     }
-    
-    
 }
 
 function drawShipTrail() {
