@@ -119,6 +119,7 @@ let level = 1;
 let time = 0;
 let gameOver = false;
 let gameOverTime = 0;
+let totalDeltaV = 0;
 let offsetX = 0;
 let offsetY = 0;
 let sliding = false;
@@ -238,8 +239,10 @@ function update(dt) {
         
         const speed = Math.sqrt(ship.vx * ship.vx + ship.vy * ship.vy);
         if (speed > 0) {
-            ship.vx += (ship.vx / speed) * THRUST_POWER * dt;
-            ship.vy += (ship.vy / speed) * THRUST_POWER * dt;
+            const dv = THRUST_POWER * dt;
+            ship.vx += (ship.vx / speed) * dv;
+            ship.vy += (ship.vy / speed) * dv;
+            totalDeltaV += dv;
         }
         
         return;
@@ -260,10 +263,12 @@ function update(dt) {
             const circularSpeed = Math.sqrt(G * body.mass / orbitDist);
             const currentSpeed = Math.sqrt(ship.vx * ship.vx + ship.vy * ship.vy);
             if (currentSpeed > circularSpeed) {
-                ship.vx -= (ship.vx / currentSpeed) * THRUST_POWER * dt;
-                ship.vy -= (ship.vy / currentSpeed) * THRUST_POWER * dt;
+                const dv = THRUST_POWER * dt;
+                ship.vx -= (ship.vx / currentSpeed) * dv;
+                ship.vy -= (ship.vy / currentSpeed) * dv;
+                totalDeltaV += dv;
                 return;
-            }else{
+            } else {
                 const scale = circularSpeed / currentSpeed;
                 ship.vx *= scale;
                 ship.vy *= scale;
@@ -495,25 +500,17 @@ function drawStars() {
 function drawUI() {
     ctx.font = '14px "Courier New", monospace';
     ctx.fillStyle = '#00e5ff';
+    ctx.textAlign = 'right';
+    ctx.fillText(`DV: ${Math.round(totalDeltaV)}`, W - 20, 30);
+    ctx.fillText(`LEVEL ${level}`, W - 20, 50);
     ctx.textAlign = 'left';
     
-    const currentPlanet = ship.orbiting || planets.at(-2);
-    const dist = Math.sqrt(
-        Math.pow(ship.x - currentPlanet.x, 2) + 
-        Math.pow(ship.y - currentPlanet.y, 2)
-    );
-    
     if (level === 1) {
-        ctx.fillText(`ALT: ${Math.round(dist - MIN_ORBIT_RADIUS)}`, 20, 30);
-        ctx.fillText(`LEVEL ${level}`, 20, 50);
-        
         ctx.textAlign = 'center';
         ctx.fillStyle = '#ffffff';
         ctx.globalAlpha = 0.7 + Math.sin(time * 3) * 0.3;
         ctx.fillText('HOLD TO RAISE ORBIT', W / 2, H - 40);
         ctx.globalAlpha = 1;
-    } else {
-        ctx.fillText(`LEVEL ${level}`, 20, 30);
     }
 }
 
@@ -537,16 +534,17 @@ function drawGameOver() {
     ctx.textAlign = 'center';
     ctx.shadowColor = '#ff3535';
     ctx.shadowBlur = 20;
-    ctx.fillText('LOST IN SPACE', W / 2, H / 2 - 20);
+    ctx.fillText('GAME OVER', W / 2, H / 2 - 40);
     ctx.shadowBlur = 0;
     
     ctx.font = '18px "Courier New", monospace';
     ctx.fillStyle = '#ffffff';
-    ctx.fillText(`Reached Level ${level}`, W / 2, H / 2 + 25);
+    ctx.fillText(`Level ${level}`, W / 2, H / 2);
+    ctx.fillText(`DeltaV: ${Math.round(totalDeltaV)}`, W / 2, H / 2 + 30);
     
-    if (gameOverTime > 2) {
-        resetGame();
-    }
+    ctx.font = '14px "Courier New", monospace';
+    ctx.fillStyle = '#aaaaaa';
+    ctx.fillText('Click to restart', W / 2, H / 2 + 70);
 }
 
 function resetGame() {
@@ -555,6 +553,7 @@ function resetGame() {
     level = 1;
     gameOver = false;
     gameOverTime = 0;
+    totalDeltaV = 0;
     offsetX = 0;
     offsetY = 0;
     sliding = false;
@@ -589,6 +588,10 @@ function gameLoop(timestamp) {
 
 function handleStart(e) {
     e.preventDefault();
+    if (gameOver) {
+        resetGame();
+        return;
+    }
     ship.thrusting = true;
 }
 
