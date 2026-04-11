@@ -37,8 +37,30 @@ const THRUST_POWER = 40;
 const MIN_ORBIT_RADIUS = 80;
 const CAPTURE_RADIUS = 180;
 
-const planetStart = { x: 0, y: 0, radius: 60, mass: 5000, color: '#00e5ff' };
-const planetTarget = { x: 0, y: 0, radius: 55, mass: 4500, color: '#ff6b35' };
+let planets = [];
+
+function createPlanet(x, y, radius, mass, color) {
+    return { x, y, radius, mass, color };
+}
+
+function generateRandomPlanet(refX) {
+    const colors = ['#ff6b35', '#7b2cbf', '#2ec4b6', '#e71d36', '#ff9f1c', '#7209b7', '#06d6a0', '#ffd166'];
+    const radius = 35 + Math.random() * 30;
+    const mass = radius * 80;
+    return createPlanet(
+        refX + W * 0.25 + Math.random() * W * 0.35,
+        H * 0.2 + Math.random() * H * 0.6,
+        radius,
+        mass,
+        colors[Math.floor(Math.random() * colors.length)]
+    );
+}
+
+function initPlanets() {
+    planets = [];
+    planets.push(createPlanet(W * 0.25, H * 0.5, 60, 5000, '#00e5ff'));
+    planets.push(createPlanet(W * 0.75, H * 0.5, 55, 4500, '#ff6b35'));
+}
 
 let stars = [];
 function generateStars() {
@@ -55,40 +77,39 @@ function generateStars() {
 generateStars();
 
 function initPlanets() {
-    planetStart.x = W * 0.25;
-    planetStart.y = H * 0.5;
-    planetTarget.x = W * 0.75;
-    planetTarget.y = H * 0.5;
+    planets = [];
+    planets.push(createPlanet(W * 0.25, H * 0.5, 60, 5000, '#00e5ff'));
+    planets.push(createPlanet(W * 0.75, H * 0.5, 55, 4500, '#ff6b35'));
 }
 initPlanets();
 window.addEventListener('resize', () => { initPlanets(); generateStars(); repositionShip(); });
 
 function repositionShip() {
-    const dx = ship.x - planetStart.x;
-    const dy = ship.y - planetStart.y;
+    const dx = ship.x - planets.at(-2).x;
+    const dy = ship.y - planets.at(-2).y;
     const dist = Math.sqrt(dx * dx + dy * dy);
     const angle = Math.atan2(dy, dx);
     const newDist = Math.max(MIN_ORBIT_RADIUS + 30, dist);
-    ship.x = planetStart.x + Math.cos(angle) * newDist;
-    ship.y = planetStart.y + Math.sin(angle) * newDist;
+    ship.x = planets.at(-2).x + Math.cos(angle) * newDist;
+    ship.y = planets.at(-2).y + Math.sin(angle) * newDist;
 }
 
 let ship = {
     x: 0, y: 0,
     vx: 0, vy: 0,
-    orbiting: planetStart,
+    orbiting: planets.at(-2),
     trail: [],
     thrusting: false
 };
 
 function initShip() {
     const orbitRadius = MIN_ORBIT_RADIUS + 30;
-    ship.x = planetStart.x + orbitRadius;
-    ship.y = planetStart.y;
-    const orbitalSpeed = Math.sqrt(G * planetStart.mass / orbitRadius);
+    ship.x = planets.at(-2).x + orbitRadius;
+    ship.y = planets.at(-2).y;
+    const orbitalSpeed = Math.sqrt(G * planets.at(-2).mass / orbitRadius);
     ship.vx = 0;
     ship.vy = -orbitalSpeed;
-    ship.orbiting = planetStart;
+    ship.orbiting = planets.at(-2);
     ship.trail = [];
     ship.thrusting = false;
 }
@@ -122,37 +143,21 @@ function generateRandomPlanet(refX) {
 }
 
 function transitionToNextLevel() {
-    const oldTargetPos = { x: planetTarget.x, y: planetTarget.y };
-    const oldStartPos = { x: planetStart.x, y: planetStart.y };
+    const oldOrbit = planets.at(-2);
+    const newOrbit = planets.at(-1);
     
-    const target = generateRandomPlanet(oldTargetPos.x);
+    const newPlanet = generateRandomPlanet(newOrbit.x);
+    planets.push(newPlanet);
     
-    const newTargetX = target.x;
-    const newTargetY = target.y;
+    ship.orbiting = newOrbit;
     
-    const newStartX = oldTargetPos.x;
-    const newStartY = oldTargetPos.y;
-    
-    planetStart.x = newStartX;
-    planetStart.y = newStartY;
-    planetStart.radius = planetTarget.radius;
-    planetStart.mass = planetTarget.mass;
-    planetStart.color = planetTarget.color;
-    
-    planetTarget.x = target.x;
-    planetTarget.y = target.y;
-    planetTarget.radius = target.radius;
-    planetTarget.mass = target.mass;
-    planetTarget.color = target.color;
-    
-    ship.orbiting = planetStart;
-    ship.x = planetStart.x + (ship.x - oldTargetPos.x);
-    ship.y = planetStart.y + (ship.y - oldTargetPos.y);
+    const slideOffsetX = oldOrbit.x - newOrbit.x;
+    const slideOffsetY = oldOrbit.y - newOrbit.y;
     
     slideStartX = offsetX;
     slideStartY = offsetY;
-    slideTargetX = oldStartPos.x - newStartX;
-    slideTargetY = oldStartPos.y - newStartY;
+    slideTargetX = offsetX + slideOffsetX;
+    slideTargetY = offsetY + slideOffsetY;
     slideProgress = 0;
     sliding = true;
     
@@ -246,18 +251,18 @@ function update(dt) {
     ship.y += ship.vy * dt;
     
     const distToStart = Math.sqrt(
-        Math.pow(ship.x - planetStart.x, 2) + 
-        Math.pow(ship.y - planetStart.y, 2)
+        Math.pow(ship.x - planets.at(-2).x, 2) + 
+        Math.pow(ship.y - planets.at(-2).y, 2)
     );
     const distToTarget = Math.sqrt(
-        Math.pow(ship.x - planetTarget.x, 2) + 
-        Math.pow(ship.y - planetTarget.y, 2)
+        Math.pow(ship.x - planets.at(-1).x, 2) + 
+        Math.pow(ship.y - planets.at(-1).y, 2)
     );
     
     if (distToTarget < distToStart) {
-        ship.orbiting = planetTarget;
+        ship.orbiting = planets.at(-1);
     } else {
-        ship.orbiting = planetStart;
+        ship.orbiting = planets.at(-2);
     }
     
     if (perigeePos) {
@@ -285,8 +290,8 @@ function update(dt) {
     
     if (distToTarget < distToStart && !sliding) {
         transitionToNextLevel();
-    } else if (distToTarget > distToStart) {
-        ship.orbiting = planetStart;
+    } else if (distToStart < CAPTURE_RADIUS && distToTarget > CAPTURE_RADIUS && ship.orbiting !== planets.at(-2)) {
+        ship.orbiting = planets.at(-2);
     }
     
     if (!gameOver && !sliding) {
@@ -477,7 +482,7 @@ function drawUI() {
     ctx.fillStyle = '#00e5ff';
     ctx.textAlign = 'left';
     
-    const currentPlanet = planetTarget;
+    const currentPlanet = ship.orbiting || planets.at(-2);
     const dist = Math.sqrt(
         Math.pow(ship.x - currentPlanet.x, 2) + 
         Math.pow(ship.y - currentPlanet.y, 2)
@@ -553,8 +558,7 @@ function gameLoop(timestamp) {
     
     drawStars();
     drawOrbitPath();
-    drawPlanet(planetStart);
-    drawPlanet(planetTarget);
+    planets.forEach(p => drawPlanet(p));
     drawShipTrail();
     drawShip();
     drawPerigee();
