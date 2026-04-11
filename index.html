@@ -163,6 +163,11 @@ function transitionToNextLevel() {
     
     level++;
 
+    perigeePos = {
+        x: ship.orbiting.x,
+        y: ship.orbiting.y,
+    }
+
     const body = ship.orbiting;
     const dx = ship.x - body.x;
     const dy = ship.y - body.y;
@@ -180,6 +185,8 @@ function transitionToNextLevel() {
     const e = Math.sqrt(eVecX * eVecX + eVecY * eVecY);
     
     const a = (G * body.mass) / (2 * (G * body.mass) / currentDist - speedSq);
+
+    console.log(`a: ${a.toFixed(2)}, e: ${e.toFixed(2)}`);
     
     if (a > 0 && e > 0.05 && e < 0.95) {
         const perigeeDist = a * (1 - e);
@@ -272,20 +279,14 @@ function update(dt) {
     ship.x += ship.vx * dt;
     ship.y += ship.vy * dt;
     
-    const distToStart = Math.sqrt(
+    const distToStart = (
         Math.pow(ship.x - planets.at(-2).x, 2) + 
         Math.pow(ship.y - planets.at(-2).y, 2)
     );
-    const distToTarget = Math.sqrt(
+    const distToTarget = (
         Math.pow(ship.x - planets.at(-1).x, 2) + 
         Math.pow(ship.y - planets.at(-1).y, 2)
     );
-    
-    if (distToTarget < distToStart) {
-        ship.orbiting = planets.at(-1);
-    } else {
-        ship.orbiting = planets.at(-2);
-    }
     
     ship.trail.push({ x: ship.x, y: ship.y, alpha: 1 });
     if (ship.trail.length > 60) ship.trail.shift();
@@ -293,7 +294,7 @@ function update(dt) {
     
     if (distToTarget < distToStart && !sliding) {
         transitionToNextLevel();
-    } else if (distToStart < CAPTURE_RADIUS && distToTarget > CAPTURE_RADIUS && ship.orbiting !== planets.at(-2)) {
+    } else if (distToTarget > distToStart) {
         ship.orbiting = planets.at(-2);
     }
     
@@ -363,6 +364,13 @@ function drawOrbitPath() {
     const a = (G * body.mass) / (2 * (G * body.mass) / currentDist - speedSq);
     
     if (a > 0 && e < 1 && e > 0.01) {
+        if(perigeePos){
+            const perigeeDist = a * (1 - e);
+            
+            perigeePos.x = body.x + (perigeeDist * eVecX / e);
+            perigeePos.y = body.y + (perigeeDist * eVecY / e);
+        }
+
         const cx = body.x - a * eVecX;
         const cy = body.y - a * eVecY;
         const b = a * Math.sqrt(1 - e * e);
@@ -387,6 +395,7 @@ function drawOrbitPath() {
         ctx.arc(bodyPos.x, bodyPos.y, currentDist, 0, Math.PI * 2);
         ctx.stroke();
         ctx.setLineDash([]);
+        perigeePos = null;
     }
     
     
