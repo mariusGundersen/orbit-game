@@ -78,8 +78,14 @@ generateStars();
 
 function initPlanets() {
     planets = [];
-    planets.push(createPlanet(W * 0.25, H * 0.5, 60, 5000, '#00e5ff'));
-    planets.push(createPlanet(W * 0.75, H * 0.5, 55, 4500, '#ff6b35'));
+    
+    const startX = W > H ? W * 0.25 : W * 0.5;
+    const startY = W > H ? H * 0.5 : H * 0.75;
+    planets.push(createPlanet(startX, startY, 60, 5000, '#00e5ff'));
+    
+    const targetX = W > H ? W * 0.75 : W * 0.5;
+    const targetY = W > H ? H * 0.5 : H * 0.25;
+    planets.push(createPlanet(targetX, targetY, 55, 4500, '#ff6b35'));
 }
 initPlanets();
 window.addEventListener('resize', () => { initPlanets(); generateStars(); repositionShip(); });
@@ -130,13 +136,23 @@ let slideTargetX = 0;
 let slideTargetY = 0;
 let perigeePos = null;
 
-function generateRandomPlanet(refX) {
+function generateRandomPlanet(refX, refY) {
     const colors = ['#ff6b35', '#7b2cbf', '#2ec4b6', '#e71d36', '#ff9f1c', '#7209b7', '#06d6a0', '#ffd166'];
     const radius = 35 + Math.random() * 30;
     const mass = radius * 80;
+    
+    let x, y;
+    if (W > H) {
+        x = refX + W * 0.25 + Math.random() * W * 0.35;
+        y = H * 0.2 + Math.random() * H * 0.6;
+    } else {
+        x = W * 0.2 + Math.random() * W * 0.6;
+        y = refY - H * 0.25 - Math.random() * H * 0.35;
+    }
+    
     return {
-        x: refX + W * 0.25 + Math.random() * W * 0.35,
-        y: H * 0.2 + Math.random() * H * 0.6,
+        x: x,
+        y: y,
         radius: radius,
         mass: mass,
         color: colors[Math.floor(Math.random() * colors.length)]
@@ -147,7 +163,7 @@ function transitionToNextLevel() {
     const oldOrbit = planets.at(-2);
     const newOrbit = planets.at(-1);
     
-    const newPlanet = generateRandomPlanet(newOrbit.x);
+    const newPlanet = generateRandomPlanet(newOrbit.x, newOrbit.y);
     planets.push(newPlanet);
     
     ship.orbiting = newOrbit;
@@ -307,10 +323,26 @@ function update(dt) {
     }
     
     if (!gameOver && !sliding) {
-        const screenPos = worldToScreen(ship.x, ship.y);
-        if (screenPos.x < -100 || screenPos.x > W + 100 || screenPos.y < -100 || screenPos.y > H + 100) {
-            gameOver = true;
-            gameOverTime = 0;
+        const body = ship.orbiting;
+        const dx = ship.x - body.x;
+        const dy = ship.y - body.y;
+        const currentDist = Math.sqrt(dx * dx + dy * dy);
+        const speedSq = ship.vx * ship.vx + ship.vy * ship.vy;
+        
+        const rx = dx / currentDist;
+        const ry = dy / currentDist;
+        
+        const h = dx * ship.vy - dy * ship.vx;
+        const eVecX = (ship.vy * h) / (G * body.mass) - rx;
+        const eVecY = (-ship.vx * h) / (G * body.mass) - ry;
+        const e = Math.sqrt(eVecX * eVecX + eVecY * eVecY);
+        
+        if (e >= 1) {
+            const screenPos = worldToScreen(ship.x, ship.y);
+            if (screenPos.x < -100 || screenPos.x > W + 100 || screenPos.y < -100 || screenPos.y > H + 100) {
+                gameOver = true;
+                gameOverTime = 0;
+            }
         }
     }
 }
