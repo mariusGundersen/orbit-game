@@ -35,7 +35,10 @@ window.addEventListener('resize', resize);
 const G = 2000;
 const THRUST_POWER = 40;
 const MIN_ORBIT_RADIUS = 80;
-const CAPTURE_RADIUS = 180;
+
+const AUTO_CIRCULARIZE = false;
+
+
 
 let planets = [];
 
@@ -182,10 +185,10 @@ function transitionToNextLevel() {
     
     level++;
 
-    perigeePos = {
+    perigeePos = AUTO_CIRCULARIZE ? {
         x: ship.orbiting.x,
         y: ship.orbiting.y,
-    }
+    } : null;
 
     const body = ship.orbiting;
     const dx = ship.x - body.x;
