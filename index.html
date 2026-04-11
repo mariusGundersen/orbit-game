@@ -235,14 +235,36 @@ function update(dt) {
             ship.vy += (ship.vy / speed) * THRUST_POWER * dt;
         }
         
-        ship.trail.push({ x: ship.x, y: ship.y, alpha: 1 });
-        if (ship.trail.length > 60) ship.trail.shift();
-        ship.trail.forEach(p => p.alpha -= dt * 1.5);
-        
         return;
     }
     
     const body = ship.orbiting;
+
+    if (perigeePos) {
+        const distToPerigee = Math.sqrt(
+            Math.pow(ship.x - perigeePos.x, 2) + 
+            Math.pow(ship.y - perigeePos.y, 2)
+        );
+        if (distToPerigee < 15) {
+            const orbitDist = Math.sqrt(
+                Math.pow(ship.x - body.x, 2) + 
+                Math.pow(ship.y - body.y, 2)
+            );
+            const circularSpeed = Math.sqrt(G * body.mass / orbitDist);
+            const currentSpeed = Math.sqrt(ship.vx * ship.vx + ship.vy * ship.vy);
+            if (currentSpeed > circularSpeed){
+                ship.vx -= (ship.vx / currentSpeed) * THRUST_POWER * dt;
+                ship.vy -= (ship.vy / currentSpeed) * THRUST_POWER * dt;
+                return;
+            }else{
+                const scale = circularSpeed / currentSpeed;
+                ship.vx *= scale;
+                ship.vy *= scale;
+                perigeePos = null;
+            }
+        }
+    }
+    
     const grav = getGravity(ship, body);
     ship.vx += grav.ax * dt;
     ship.vy += grav.ay * dt;
@@ -263,25 +285,6 @@ function update(dt) {
         ship.orbiting = planets.at(-1);
     } else {
         ship.orbiting = planets.at(-2);
-    }
-    
-    if (perigeePos) {
-        const distToPerigee = Math.sqrt(
-            Math.pow(ship.x - perigeePos.x, 2) + 
-            Math.pow(ship.y - perigeePos.y, 2)
-        );
-        if (distToPerigee < 15) {
-            const orbitDist = Math.sqrt(
-                Math.pow(ship.x - body.x, 2) + 
-                Math.pow(ship.y - body.y, 2)
-            );
-            const circularSpeed = Math.sqrt(G * body.mass / orbitDist);
-            const currentSpeed = Math.sqrt(ship.vx * ship.vx + ship.vy * ship.vy);
-            const scale = circularSpeed / currentSpeed;
-            ship.vx *= scale;
-            ship.vy *= scale;
-            perigeePos = null;
-        }
     }
     
     ship.trail.push({ x: ship.x, y: ship.y, alpha: 1 });
