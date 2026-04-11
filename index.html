@@ -94,7 +94,6 @@ function initShip() {
 }
 initShip();
 
-let captured = false;
 let level = 1;
 let time = 0;
 let gameOver = false;
@@ -107,7 +106,6 @@ let slideStartX = 0;
 let slideStartY = 0;
 let slideTargetX = 0;
 let slideTargetY = 0;
-let willCircularize = true;
 let perigeePos = null;
 
 function generateRandomPlanet(refX) {
@@ -141,8 +139,8 @@ function transitionToNextLevel() {
     planetStart.mass = planetTarget.mass;
     planetStart.color = planetTarget.color;
     
-    planetTarget.x = newTargetX;
-    planetTarget.y = newTargetY;
+    planetTarget.x = target.x;
+    planetTarget.y = target.y;
     planetTarget.radius = target.radius;
     planetTarget.mass = target.mass;
     planetTarget.color = target.color;
@@ -158,9 +156,36 @@ function transitionToNextLevel() {
     slideProgress = 0;
     sliding = true;
     
-    captured = false;
     level++;
-    willCircularize = true;
+
+    const body = ship.orbiting;
+    const dx = ship.x - body.x;
+    const dy = ship.y - body.y;
+    const currentDist = Math.sqrt(dx * dx + dy * dy);
+    const vx = ship.vx;
+    const vy = ship.vy;
+    const speedSq = vx * vx + vy * vy;
+    
+    const rx = dx / currentDist;
+    const ry = dy / currentDist;
+    
+    const h = dx * vy - dy * vx;
+    const eVecX = (vy * h) / (G * body.mass) - rx;
+    const eVecY = (-vx * h) / (G * body.mass) - ry;
+    const e = Math.sqrt(eVecX * eVecX + eVecY * eVecY);
+    
+    const a = (G * body.mass) / (2 * (G * body.mass) / currentDist - speedSq);
+    
+    if (a > 0 && e > 0.05 && e < 0.95) {
+        const perigeeDist = a * (1 - e);
+        
+        perigeePos = {
+            x: body.x + (perigeeDist * eVecX / e),
+            y: body.y - (perigeeDist * eVecY / e)
+        };
+    } else {
+        perigeePos = null;
+    }
 }
      
 function getGravity(pos, body) {
@@ -178,7 +203,7 @@ function worldToScreen(x, y) {
 
 function update(dt) {
     if (sliding) {
-        slideProgress += dt * 3;
+        slideProgress += dt;
         if (slideProgress >= 1) {
             slideProgress = 1;
             sliding = false;
@@ -187,14 +212,6 @@ function update(dt) {
         const ease = t * (2 - t);
         offsetX = slideStartX + (slideTargetX - slideStartX) * ease;
         offsetY = slideStartY + (slideTargetY - slideStartY) * ease;
-        
-        time += dt;
-        return;
-    }
-    
-    if (captured) {
-        time += dt;
-        return;
     }
     
     if (gameOver) {
@@ -205,7 +222,6 @@ function update(dt) {
     time += dt;
     
     if (ship.thrusting) {
-        willCircularize = false;
         perigeePos = null;
         
         const speed = Math.sqrt(ship.vx * ship.vx + ship.vy * ship.vy);
@@ -219,37 +235,6 @@ function update(dt) {
         ship.trail.forEach(p => p.alpha -= dt * 1.5);
         
         return;
-    }
-    
-    if (willCircularize && !perigeePos) {
-        const body = ship.orbiting;
-        const dx = ship.x - body.x;
-        const dy = ship.y - body.y;
-        const currentDist = Math.sqrt(dx * dx + dy * dy);
-        const vx = ship.vx;
-        const vy = ship.vy;
-        const speedSq = vx * vx + vy * vy;
-        
-        const rx = dx / currentDist;
-        const ry = dy / currentDist;
-        
-        const h = dx * vy - dy * vx;
-        const eVecX = (vy * h) / (G * body.mass) - rx;
-        const eVecY = (-vx * h) / (G * body.mass) - ry;
-        const e = Math.sqrt(eVecX * eVecX + eVecY * eVecY);
-        
-        const a = (G * body.mass) / (2 * (G * body.mass) / currentDist - speedSq);
-        
-        if (a > 0 && e > 0.05 && e < 0.95) {
-            const perigeeDist = a * (1 - e);
-            
-            perigeePos = {
-                x: body.x - (perigeeDist * eVecX / e),
-                y: body.y - (perigeeDist * eVecY / e)
-            };
-        } else {
-            perigeePos = null;
-        }
     }
     
     const body = ship.orbiting;
@@ -275,7 +260,7 @@ function update(dt) {
         ship.orbiting = planetStart;
     }
     
-    if (perigeePos && willCircularize) {
+    if (perigeePos) {
         const distToPerigee = Math.sqrt(
             Math.pow(ship.x - perigeePos.x, 2) + 
             Math.pow(ship.y - perigeePos.y, 2)
@@ -290,7 +275,6 @@ function update(dt) {
             const scale = circularSpeed / currentSpeed;
             ship.vx *= scale;
             ship.vy *= scale;
-            willCircularize = false;
             perigeePos = null;
         }
     }
@@ -299,22 +283,13 @@ function update(dt) {
     if (ship.trail.length > 60) ship.trail.shift();
     ship.trail.forEach(p => p.alpha -= dt * 1.5);
     
-    const targetDist = Math.sqrt(
-        Math.pow(ship.x - planetTarget.x, 2) + 
-        Math.pow(ship.y - planetTarget.y, 2)
-    );
-    if (targetDist < CAPTURE_RADIUS && !captured && !sliding && distToStart > CAPTURE_RADIUS) {
-        captured = true;
-        setTimeout(() => {
-            if (captured) {
-                transitionToNextLevel();
-            }
-        }, 700);
-    } else if (distToStart < CAPTURE_RADIUS && distToTarget > CAPTURE_RADIUS && ship.orbiting !== planetStart && !captured && !sliding) {
+    if (distToTarget < distToStart && !sliding) {
+        transitionToNextLevel();
+    } else if (distToTarget > distToStart) {
         ship.orbiting = planetStart;
     }
     
-    if (!gameOver && !captured && !sliding) {
+    if (!gameOver && !sliding) {
         const screenPos = worldToScreen(ship.x, ship.y);
         if (screenPos.x < -100 || screenPos.x > W + 100 || screenPos.y < -100 || screenPos.y > H + 100) {
             gameOver = true;
@@ -406,39 +381,7 @@ function drawOrbitPath() {
         ctx.setLineDash([]);
     }
     
-    if (ship.thrusting && ship.orbiting === planetStart) {
-        const currentSpeed = Math.sqrt(ship.vx * ship.vx + ship.vy * ship.vy);
-        const thrustDirX = ship.vx / currentSpeed;
-        const thrustDirY = ship.vy / currentSpeed;
-        
-        const vxNew = ship.vx + thrustDirX * 3;
-        const vyNew = ship.vy + thrustDirY * 3;
-        
-        const h = dx * vyNew - dy * vxNew;
-        const eVecX = (vyNew * h) / (G * body.mass) - rx;
-        const eVecY = (-vxNew * h) / (G * body.mass) - ry;
-        const e = Math.sqrt(eVecX * eVecX + eVecY * eVecY);
-        
-        const speedSq = vxNew * vxNew + vyNew * vyNew;
-        const a = (G * body.mass) / (2 * (G * body.mass) / currentDist - speedSq);
-        
-        if (a > 0 && e < 1 && e > 0.01) {
-            const cx = body.x - a * eVecX;
-            const cy = body.y - a * eVecY;
-            const b = a * Math.sqrt(1 - e * e);
-            
-            const angle = Math.atan2(eVecY, eVecX);
-            const centerPos = worldToScreen(cx, cy);
-            
-            ctx.strokeStyle = body.color + '60';
-            ctx.lineWidth = 2;
-            ctx.setLineDash([4, 4]);
-            ctx.beginPath();
-            ctx.ellipse(centerPos.x, centerPos.y, a, b, angle, 0, Math.PI * 2);
-            ctx.stroke();
-            ctx.setLineDash([]);
-        }
-    }
+    
 }
 
 function drawShipTrail() {
@@ -495,7 +438,7 @@ function drawShip() {
 }
 
 function drawPerigee() {
-    if (!perigeePos || !willCircularize) return;
+    if (!perigeePos) return;
     
     const pos = worldToScreen(perigeePos.x, perigeePos.y);
     const pulse = Math.sin(time * 5) * 0.3 + 0.7;
@@ -534,13 +477,13 @@ function drawUI() {
     ctx.fillStyle = '#00e5ff';
     ctx.textAlign = 'left';
     
-    const currentPlanet = !captured ? ship.orbiting : planetTarget;
+    const currentPlanet = planetTarget;
     const dist = Math.sqrt(
         Math.pow(ship.x - currentPlanet.x, 2) + 
         Math.pow(ship.y - currentPlanet.y, 2)
     );
     
-    if (!captured) {
+    if (level === 1) {
         ctx.fillText(`ALT: ${Math.round(dist - MIN_ORBIT_RADIUS)}`, 20, 30);
         ctx.fillText(`LEVEL ${level}`, 20, 50);
         
@@ -590,14 +533,12 @@ function resetGame() {
     initPlanets();
     initShip();
     level = 1;
-    captured = false;
     gameOver = false;
     gameOverTime = 0;
     offsetX = 0;
     offsetY = 0;
     sliding = false;
     slideProgress = 0;
-    willCircularize = true;
     perigeePos = null;
 }
 
