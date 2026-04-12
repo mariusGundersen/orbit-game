@@ -131,7 +131,25 @@ let time = 0;
 let gameOver = false;
 let gameOverTime = 0;
 let totalDeltaV = 0;
+let levelDeltaVs = {};
+let highScores = {};
 let offsetX = 0;
+
+function loadHighScores() {
+    const stored = localStorage.getItem('orbitHighScores');
+    if (stored) {
+        highScores = JSON.parse(stored);
+    }
+}
+
+function saveHighScore(lvl, dv) {
+    if (!highScores[lvl] || dv < highScores[lvl]) {
+        highScores[lvl] = dv;
+        localStorage.setItem('orbitHighScores', JSON.stringify(highScores));
+    }
+}
+
+loadHighScores();
 let offsetY = 0;
 let sliding = false;
 let slideProgress = 0;
@@ -239,6 +257,8 @@ function transitionToNextLevel() {
     ship.orbiting = newOrbit;
     sliding = true;
     
+    levelDeltaVs[level] = totalDeltaV;
+    saveHighScore(level, totalDeltaV);
     level++;
 
     perigeePos = AUTO_CIRCULARIZE ? {
@@ -290,7 +310,8 @@ function update(dt) {
             const dv = THRUST_POWER * dt * ship.thrustDir;
             ship.vx += (ship.vx / speed) * dv;
             ship.vy += (ship.vy / speed) * dv;
-            totalDeltaV += Math.abs(dv);
+            const absDv = Math.abs(dv);
+            totalDeltaV += absDv;
         }
         
         return;
@@ -664,17 +685,68 @@ function drawGameOver() {
     ctx.textAlign = 'center';
     ctx.shadowColor = '#ff3535';
     ctx.shadowBlur = 20;
-    ctx.fillText('GAME OVER', W / 2, H / 2 - 40);
+    ctx.fillText('GAME OVER', W / 2, 50);
     ctx.shadowBlur = 0;
     
-    ctx.font = '18px "Courier New", monospace';
+    ctx.font = '16px "Courier New", monospace';
     ctx.fillStyle = '#ffffff';
-    ctx.fillText(`Level ${level}`, W / 2, H / 2);
-    ctx.fillText(`DeltaV: ${Math.round(totalDeltaV)}`, W / 2, H / 2 + 30);
+    ctx.fillText(`Highest Level: ${level}`, W / 2, 90);
+    
+    const tableStartY = 130;
+    const col1X = W / 2 - 80;
+    const col2X = W / 2 + 40;
+    const col3X = W / 2 + 100;
+    
+    ctx.font = 'bold 14px "Courier New", monospace';
+    ctx.fillStyle = '#00e5ff';
+    ctx.fillText('LEVEL', col1X, tableStartY);
+    ctx.fillText('BEST', col2X, tableStartY);
+    ctx.fillText('RUN', col3X, tableStartY);
+    
+    ctx.strokeStyle = '#00e5ff';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(W / 2 - 120, tableStartY + 10);
+    ctx.lineTo(W / 2 + 120, tableStartY + 10);
+    ctx.stroke();
     
     ctx.font = '14px "Courier New", monospace';
-    ctx.fillStyle = '#aaaaaa';
-    ctx.fillText('Click to restart', W / 2, H / 2 + 70);
+    const maxLevels = Math.min(level, 10);
+    let totalBest = 0;
+    let totalRun = 0;
+    let y = tableStartY + 25;
+    for (let i = 1; i <= maxLevels; i++) {
+        const best = highScores[i] || 0;
+        const run = levelDeltaVs[i] || 0;
+        const isCurrent = i === level;
+        ctx.fillStyle = isCurrent ? '#ff6b35' : '#aaaaaa';
+        ctx.fillText(i.toString(), col1X, y);
+        ctx.fillStyle = isCurrent ? '#00ff88' : '#666666';
+        ctx.fillText(Math.round(best).toString(), col2X, y);
+        ctx.fillStyle = isCurrent ? '#ff6b35' : '#aaaaaa';
+        ctx.fillText(run > 0 ? Math.round(run).toString() : '-', col3X, y);
+        totalBest += best;
+        totalRun += run;
+        y += 20;
+    }
+    
+    if (maxLevels > 0) {
+        ctx.strokeStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.moveTo(W / 2 - 120, y + 5);
+        ctx.lineTo(W / 2 + 120, y + 5);
+        ctx.stroke();
+        
+        ctx.font = 'bold 14px "Courier New", monospace';
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText('TOTAL', col1X, y + 25);
+        ctx.fillText(Math.round(totalBest).toString(), col2X, y + 25);
+        ctx.fillText(Math.round(totalRun).toString(), col3X, y + 25);
+    }
+    
+    ctx.font = '14px "Courier New", monospace';
+    ctx.fillStyle = '#666666';
+    ctx.fillText('Click to restart', W / 2, H - 30);
 }
 
 function resetGame() {
@@ -684,6 +756,7 @@ function resetGame() {
     gameOver = false;
     gameOverTime = 0;
     totalDeltaV = 0;
+    levelDeltaVs = {};
     offsetX = 0;
     offsetY = 0;
     sliding = false;
