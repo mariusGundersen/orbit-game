@@ -129,10 +129,9 @@ initShip();
 let level = 1;
 let time = 0;
 let gameOver = false;
-let gameOverTime = 0;
 let totalDeltaV = 0;
 let levelDeltaVs = {};
-let highScores = {};
+let highScores = [];
 let offsetX = 0;
 
 function loadHighScores() {
@@ -296,7 +295,6 @@ function update(dt) {
     }
     
     if (gameOver) {
-        gameOverTime += dt;
         return;
     }
     
@@ -360,7 +358,6 @@ function update(dt) {
     
     if(grav.dist < body.radius) {
         gameOver = true;
-        gameOverTime = 0;
     } else if (targetGrav.force > grav.force && !sliding) {
         transitionToNextLevel();
     } 
@@ -384,7 +381,6 @@ function update(dt) {
             const screenPos = worldToScreen(ship.x, ship.y);
             if (screenPos.x < -100 || screenPos.x > W + 100 || screenPos.y < -100 || screenPos.y > H + 100) {
                 gameOver = true;
-                gameOverTime = 0;
             }
         }
     }
@@ -711,11 +707,9 @@ function drawGameOver() {
     ctx.stroke();
     
     ctx.font = '14px "Courier New", monospace';
-    const maxLevels = Math.min(level, 10);
-    let totalBest = 0;
-    let totalRun = 0;
+    const maxLevels = Math.max(level, highScores.length);
     let y = tableStartY + 25;
-    for (let i = 1; i <= maxLevels; i++) {
+    for (let i = maxLevels; i > 1; i--) {
         const best = highScores[i] || 0;
         const run = levelDeltaVs[i] || 0;
         const isCurrent = i === level;
@@ -725,23 +719,7 @@ function drawGameOver() {
         ctx.fillText(Math.round(best).toString(), col2X, y);
         ctx.fillStyle = isCurrent ? '#ff6b35' : '#aaaaaa';
         ctx.fillText(run > 0 ? Math.round(run).toString() : '-', col3X, y);
-        totalBest += best;
-        totalRun += run;
         y += 20;
-    }
-    
-    if (maxLevels > 0) {
-        ctx.strokeStyle = '#ffffff';
-        ctx.beginPath();
-        ctx.moveTo(W / 2 - 120, y + 5);
-        ctx.lineTo(W / 2 + 120, y + 5);
-        ctx.stroke();
-        
-        ctx.font = 'bold 14px "Courier New", monospace';
-        ctx.fillStyle = '#ffffff';
-        ctx.fillText('TOTAL', col1X, y + 25);
-        ctx.fillText(Math.round(totalBest).toString(), col2X, y + 25);
-        ctx.fillText(Math.round(totalRun).toString(), col3X, y + 25);
     }
     
     ctx.font = '14px "Courier New", monospace';
@@ -754,7 +732,6 @@ function resetGame() {
     initShip();
     level = 1;
     gameOver = false;
-    gameOverTime = 0;
     totalDeltaV = 0;
     levelDeltaVs = {};
     offsetX = 0;
@@ -775,7 +752,7 @@ function gameLoop(timestamp) {
     
     drawStars();
     drawOrbitPath();
-    drawSOIs();
+    //drawSOIs();
     planets.forEach(p => drawPlanet(p));
     drawExplosions();
     drawShipTrail();
