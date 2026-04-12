@@ -140,6 +140,60 @@ let slideStartY = 0;
 let slideTargetX = 0;
 let slideTargetY = 0;
 let perigeePos = null;
+let explosions = [];
+
+function createExplosion(x, y, color, radius) {
+    const particles = [];
+    for (let i = 0; i < 50; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 100 + Math.random() * 200;
+        particles.push({
+            x: x + Math.cos(angle) * radius,
+            y: y + Math.sin(angle) * radius,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            alpha: 1,
+            size: 3 + Math.random() * 6,
+            color: color
+        });
+    }
+    explosions.push({ particles, time: 0 });
+}
+
+function updateExplosions(dt) {
+    for (let i = explosions.length - 1; i >= 0; i--) {
+        const exp = explosions[i];
+        exp.time += dt;
+        
+        for (const p of exp.particles) {
+            p.x += p.vx * dt;
+            p.y += p.vy * dt;
+            p.vx *= 0.98;
+            p.vy *= 0.98;
+            p.alpha -= dt * 0.8;
+            p.size *= 0.99;
+        }
+        
+        if (exp.time > 1) {
+            explosions.splice(i, 1);
+        }
+    }
+}
+
+function drawExplosions() {
+    for (const exp of explosions) {
+        for (const p of exp.particles) {
+            if (p.alpha <= 0) continue;
+            const pos = worldToScreen(p.x, p.y);
+            ctx.globalAlpha = p.alpha;
+            ctx.fillStyle = p.color;
+            ctx.beginPath();
+            ctx.arc(pos.x, pos.y, p.size, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    }
+    ctx.globalAlpha = 1;
+}
 
 function generateRandomPlanet(refX, refY) {
     const colors = ['#ff6b35', '#7b2cbf', '#2ec4b6', '#e71d36', '#ff9f1c', '#7209b7', '#06d6a0', '#ffd166'];
@@ -168,11 +222,6 @@ function transitionToNextLevel() {
     const oldOrbit = planets.at(-2);
     const newOrbit = planets.at(-1);
     
-    const newPlanet = generateRandomPlanet(newOrbit.x, newOrbit.y);
-    planets.push(newPlanet);
-    
-    ship.orbiting = newOrbit;
-    
     const slideOffsetX = oldOrbit.x - newOrbit.x;
     const slideOffsetY = oldOrbit.y - newOrbit.y;
     
@@ -181,6 +230,13 @@ function transitionToNextLevel() {
     slideTargetX = offsetX + slideOffsetX;
     slideTargetY = offsetY + slideOffsetY;
     slideProgress = 0;
+    sliding = true;
+    
+    createExplosion(oldOrbit.x, oldOrbit.y, oldOrbit.color, oldOrbit.radius);
+    
+    const newPlanet = generateRandomPlanet(newOrbit.x, newOrbit.y);
+    planets.push(newPlanet);
+    ship.orbiting = newOrbit;
     sliding = true;
     
     level++;
@@ -205,6 +261,8 @@ function worldToScreen(x, y) {
 }
 
 function update(dt) {
+    updateExplosions(dt);
+    
     if (sliding) {
         slideProgress += dt;
         if (slideProgress >= 1) {
@@ -624,6 +682,7 @@ function gameLoop(timestamp) {
     drawStars();
     drawOrbitPath();
     planets.forEach(p => drawPlanet(p));
+    drawExplosions();
     drawShipTrail();
     drawShip();
     drawPerigee();
