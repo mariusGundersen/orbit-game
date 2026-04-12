@@ -253,7 +253,7 @@ function getGravity(pos, body) {
     const distSq = dx * dx + dy * dy;
     const dist = Math.sqrt(distSq);
     const force = G * body.mass / distSq;
-    return { ax: force * dx / dist, ay: force * dy / dist, dist };
+    return { ax: force * dx / dist, ay: force * dy / dist, dist, force, dist };
 }
 
 function worldToScreen(x, y) {
@@ -326,33 +326,23 @@ function update(dt) {
     }
     
     const grav = getGravity(ship, body);
+    const targetGrav = getGravity(ship, planets.at(-1));
     ship.vx += grav.ax * dt;
     ship.vy += grav.ay * dt;
     
     ship.x += ship.vx * dt;
     ship.y += ship.vy * dt;
-    
-    const distToStart = (
-        Math.pow(ship.x - planets.at(-2).x, 2) + 
-        Math.pow(ship.y - planets.at(-2).y, 2)
-    );
-    const distToTarget = (
-        Math.pow(ship.x - planets.at(-1).x, 2) + 
-        Math.pow(ship.y - planets.at(-1).y, 2)
-    );
-    
+        
     ship.trail.push({ x: ship.x, y: ship.y, alpha: 1 });
     if (ship.trail.length > 60) ship.trail.shift();
     ship.trail.forEach(p => p.alpha -= dt * 1.5);
     
-    if(distToStart < Math.pow(planets.at(-2).radius, 2)) {
+    if(grav.dist < body.radius) {
         gameOver = true;
         gameOverTime = 0;
-    } else if (distToTarget < distToStart && !sliding) {
+    } else if (targetGrav.force > grav.force && !sliding) {
         transitionToNextLevel();
-    } else if (distToTarget > distToStart) {
-        ship.orbiting = planets.at(-2);
-    }
+    } 
     
     if (!gameOver && !sliding) {
         const body = ship.orbiting;
@@ -412,6 +402,37 @@ function drawPlanet(body) {
     ctx.restore();
     
     drawGlow(pos.x, pos.y, body.radius, body.color, 0.3);
+}
+
+function drawSOIs() {
+    if (planets.length < 2) return;
+    
+    const p1 = planets.at(-2);
+    const p2 = planets.at(-1);
+    
+    const dx = p1.x - p2.x;
+    const dy = p1.y - p2.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    
+    const pos1 = worldToScreen(p1.x, p1.y);
+    const pos2 = worldToScreen(p2.x, p2.y);
+    const radius1 = (p1.mass / (p1.mass + p2.mass)) * dist;
+    const radius2 = (p2.mass / (p1.mass + p2.mass)) * dist;
+    const dir = Math.atan2(dy, dx);
+
+    const arcSize = Math.PI/5;
+    
+    ctx.globalAlpha = 0.4;
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(pos2.x, pos2.y, radius2, dir - arcSize, dir + arcSize);
+    ctx.stroke();
+    ctx.restore();
+    ctx.beginPath();
+    ctx.arc(pos1.x, pos1.y, radius1, dir + Math.PI - arcSize, dir + Math.PI + arcSize);
+    ctx.stroke();
+    ctx.restore();
 }
 
 function drawOrbitPath() {
@@ -681,6 +702,7 @@ function gameLoop(timestamp) {
     
     drawStars();
     drawOrbitPath();
+    drawSOIs();
     planets.forEach(p => drawPlanet(p));
     drawExplosions();
     drawShipTrail();
