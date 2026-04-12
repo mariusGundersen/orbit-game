@@ -629,7 +629,75 @@ function drawStars() {
     ctx.globalAlpha = 1;
 }
 
+function drawShipPointer() {
+    const pos = worldToScreen(ship.x, ship.y);
+    
+    if (pos.x >= 0 && pos.x <= W && pos.y >= 0 && pos.y <= H) return;
+    
+    const cx = W / 2;
+    const cy = H / 2;
+    const angle = Math.atan2(pos.y - cy, pos.x - cx);
+    
+    let edgeX, edgeY;
+    const margin = 20;
+    
+    if (pos.x < 0 || pos.x > W) {
+        if (pos.y < 0) {
+            const t = -cy / (pos.y - cy);
+            edgeX = cx + t * (pos.x - cx);
+            edgeY = -margin;
+        } else if (pos.y > H) {
+            const t = (H - cy) / (pos.y - cy);
+            edgeX = cx + t * (pos.x - cx);
+            edgeY = H + margin;
+        } else if (pos.x < 0) {
+            edgeX = -margin;
+            edgeY = pos.y;
+        } else {
+            edgeX = W + margin;
+            edgeY = pos.y;
+        }
+    } else if (pos.y < 0) {
+        edgeX = pos.x;
+        edgeY = -margin;
+    } else if (pos.y > H) {
+        edgeX = pos.x;
+        edgeY = H + margin;
+    }
+    
+    edgeX = Math.max(margin, Math.min(W - margin, edgeX));
+    edgeY = Math.max(margin, Math.min(H - margin, edgeY));
+    
+    const pointerAngle = Math.atan2(edgeY - cy, edgeX - cx);
+    
+    ctx.save();
+    ctx.translate(edgeX, edgeY);
+    ctx.rotate(pointerAngle);
+    
+    ctx.fillStyle = '#ff6b35';
+    ctx.beginPath();
+    ctx.moveTo(10, 0);
+    ctx.lineTo(-6, -6);
+    ctx.lineTo(-6, 6);
+    ctx.closePath();
+    ctx.fill();
+    
+    ctx.restore();
+    
+    const dist = Math.sqrt(
+        Math.pow(ship.x - ship.orbiting.x, 2) + 
+        Math.pow(ship.y - ship.orbiting.y, 2)
+    );
+    
+    ctx.font = '12px "Courier New", monospace';
+    ctx.fillStyle = '#ff6b35';
+    ctx.textAlign = 'center';
+    ctx.fillText(`${Math.round(dist)}`, edgeX, edgeY + (edgeY < H / 2 ? 20 : -10));
+}
+
 function drawUI() {
+    drawShipPointer();
+    
     ctx.font = '14px "Courier New", monospace';
     ctx.fillStyle = '#00e5ff';
     ctx.textAlign = 'right';
