@@ -1,6 +1,6 @@
 // @ts-check
 
-import { G, worldToScreen } from "./main.js";
+import { G } from "./main.js";
 
 export default class Planet {
   static DENSITY = 80;
@@ -66,7 +66,6 @@ export default class Planet {
    * @param {number} time
    */
   draw(ctx, time) {
-    const pos = worldToScreen(this.x, this.y);
     const pulse = Math.sin(time * 2) * 0.1 + 1;
 
     ctx.save();
@@ -74,11 +73,11 @@ export default class Planet {
     ctx.shadowBlur = 40 * pulse;
 
     const grad = ctx.createRadialGradient(
-      pos.x - this.radius * 0.3,
-      pos.y - this.radius * 0.3,
+      this.x - this.radius * 0.3,
+      this.y - this.radius * 0.3,
       0,
-      pos.x,
-      pos.y,
+      this.x,
+      this.y,
       this.radius,
     );
     grad.addColorStop(0, this.color + "ff");
@@ -87,16 +86,16 @@ export default class Planet {
 
     ctx.fillStyle = grad;
     ctx.beginPath();
-    ctx.arc(pos.x, pos.y, this.radius, 0, Math.PI * 2);
+    ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
 
     const gradient = ctx.createRadialGradient(
-      pos.x,
-      pos.y,
+      this.x,
+      this.y,
       0,
-      pos.x,
-      pos.y,
+      this.x,
+      this.y,
       this.radius * 2,
     );
     gradient.addColorStop(0, this.color);
@@ -105,7 +104,7 @@ export default class Planet {
     ctx.fillStyle = gradient;
     ctx.globalAlpha = 0.3;
     ctx.beginPath();
-    ctx.arc(pos.x, pos.y, this.radius * 2, 0, Math.PI * 2);
+    ctx.arc(this.x, this.y, this.radius * 2, 0, Math.PI * 2);
     ctx.fill();
     ctx.globalAlpha = 1;
   }

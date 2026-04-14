@@ -5,16 +5,17 @@ import Ship from './ship.js';
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 
-let W, H;
+export let W, H;
 function resize() {
-    W = canvas.width = window.innerWidth * devicePixelRatio;
-    H = canvas.height = window.innerHeight * devicePixelRatio;
+    W = window.innerWidth;
+    canvas.width = W * devicePixelRatio;
+    H = window.innerHeight;
+    canvas.height = H * devicePixelRatio;
 }
 resize();
 window.addEventListener('resize', resize);
 
 export const G = 800;
-const THRUST_POWER = 40;
 
 const AUTO_CIRCULARIZE = false;
 
@@ -131,11 +132,10 @@ function drawExplosions() {
     for (const exp of explosions) {
         for (const p of exp.particles) {
             if (p.alpha <= 0) continue;
-            const pos = worldToScreen(p.x, p.y);
             ctx.globalAlpha = p.alpha;
             ctx.fillStyle = p.color;
             ctx.beginPath();
-            ctx.arc(pos.x, pos.y, p.size, 0, Math.PI * 2);
+            ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
             ctx.fill();
         }
     }
@@ -188,6 +188,15 @@ function transitionToNextLevel() {
     } : null;
 }
 
+export function transformScreen(cb){
+    ctx.save();
+    ctx.translate(W/2, H/2);
+    ctx.scale(zoomOutFactor, zoomOutFactor);
+    ctx.translate(offsetX - W / 2, offsetY - H / 2);
+    cb();
+    ctx.restore();
+}
+
 export function worldToScreen(x, y) {
     const cx = W / 2;
     const cy = H / 2;
@@ -232,8 +241,8 @@ function endGame(){
     const contentCenterY = (contentMinY + contentMaxY) / 2;
     slideStartX = offsetX;
     slideStartY = offsetY;
-    slideTargetX = W/2-contentCenterX;
-    slideTargetY = H/2-contentCenterY;
+    slideTargetX = W/2 - contentCenterX;
+    slideTargetY = H/2 - contentCenterY;
     slideProgress = 0;
     sliding = true;
 }
@@ -416,7 +425,6 @@ function drawOrbitPath() {
         const cx = body.x - a * eVecX;
         const cy = body.y - a * eVecY;
         const angle = Math.atan2(eVecY, eVecX);
-        const centerPos = worldToScreen(cx, cy);
         
         ctx.beginPath();
         const semiMajor = Math.abs(a);
@@ -453,20 +461,19 @@ function drawOrbitPath() {
 function drawPerigee() {
     if (!perigeePos) return;
     
-    const pos = worldToScreen(perigeePos.x, perigeePos.y);
     const pulse = Math.sin(time * 5) * 0.3 + 0.7;
     
     ctx.fillStyle = '#ffff00';
     ctx.globalAlpha = pulse;
     ctx.beginPath();
-    ctx.arc(pos.x, pos.y, 6, 0, Math.PI * 2);
+    ctx.arc(perigeePos.x, perigeePos.y, 6, 0, Math.PI * 2);
     ctx.fill();
     
     ctx.strokeStyle = '#ffff00';
     ctx.lineWidth = 2;
     ctx.globalAlpha = pulse * 0.5;
     ctx.beginPath();
-    ctx.arc(pos.x, pos.y, 12, 0, Math.PI * 2);
+    ctx.arc(perigeePos.x, perigeePos.y, 12, 0, Math.PI * 2);
     ctx.stroke();
     
     ctx.globalAlpha = 1;
@@ -605,27 +612,36 @@ function gameLoop(timestamp) {
     dt = Math.min((timestamp - lastTime) / 1000, 0.05);
     lastTime = timestamp;
     
+    ctx.scale(devicePixelRatio, devicePixelRatio);
     ctx.fillStyle = '#0a0a12';
     ctx.fillRect(0, 0, W, H);
     
     drawStars();
     if(gameOver){
+        transformScreen(() => {
         planets.forEach(p => p.draw(ctx, time));
-        ship.draw(ctx, Infinity);
+            ship.draw(ctx);
+            ship.drawTrail(ctx, Infinity);
+        });
     }else{
         drawOrbitPath();
         drawSOIs();
-        planets.slice(-3).forEach(p => p.draw(ctx, time));
-        ship.draw(ctx);
+        transformScreen(() => {
+            planets.slice(-3).forEach(p => p.draw(ctx, time));
+            ship.draw(ctx);
+            ship.drawTrail(ctx);
+            drawExplosions();
+            drawPerigee();
+        });
+        ship.drawPointer(ctx);
     }
-    drawExplosions();
-    drawPerigee();
     drawUI();
     
     if (gameOver) {
         drawGameOver();
     }
     
+    ctx.resetTransform();
     update(dt);
     requestAnimationFrame(gameLoop);
 }
@@ -637,7 +653,7 @@ function handleStart(e) {
         return;
     }
     
-    ship.setThrust(e.clientX*devicePixelRatio < W / 2 ? -1 : 1);
+    ship.setThrust(e.clientX < W / 2 ? -1 : 1);
 }
 
 function handleEnd(e) {
@@ -651,7 +667,6 @@ canvas.addEventListener('pointerleave', handleEnd);
 
 function handleKeyDown(e) {
     if (gameOver) {
-        resetGame();
         return;
     }
     

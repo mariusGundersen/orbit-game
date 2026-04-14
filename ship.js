@@ -1,6 +1,6 @@
 // @ts-check
 
-import { G, worldToScreen } from "./main.js";
+import { G, H, W, worldToScreen } from "./main.js";
 import Planet from "./planet.js";
 
 const THRUST_POWER = 40;
@@ -68,11 +68,10 @@ export default class Ship {
    * @param {number} [maxTrailAge]
    */
   draw(ctx, maxTrailAge) {
-    const pos = worldToScreen(this.x, this.y);
     const angle = Math.atan2(this.vy, this.vx);
 
     ctx.save();
-    ctx.translate(pos.x, pos.y);
+    ctx.translate(this.x, this.y);
     ctx.rotate(angle);
 
     if (this.thrustDir !== 0) {
@@ -115,8 +114,6 @@ export default class Ship {
     ctx.fill();
 
     ctx.restore();
-    this.drawTrail(ctx, maxTrailAge);
-    this.drawPointer(ctx);
   }
 
   /**
@@ -130,10 +127,9 @@ export default class Ship {
       i++;
       if ((this.trail.length - i) % TRAIL_PERIODICITY !== 0) continue;
       if (i > maxTrailAge) break;
-      const pos = worldToScreen(p.x, p.y);
       ctx.globalAlpha = 1 - i / maxTrailAge;
       ctx.beginPath();
-      ctx.arc(pos.x, pos.y, 2, 0, Math.PI * 2);
+      ctx.arc(p.x, p.y, 2, 0, Math.PI * 2);
       ctx.fill();
     }
     ctx.globalAlpha = 1;
@@ -144,10 +140,8 @@ export default class Ship {
    */
   drawPointer(ctx) {
     const pos = worldToScreen(this.x, this.y);
-    const W = ctx.canvas.width;
-    const H = ctx.canvas.height;
 
-    const margin = 20;
+    const margin = 0;
     let edgeX, edgeY;
 
     if (pos.x < margin) {
@@ -191,9 +185,9 @@ export default class Ship {
 
     ctx.fillStyle = "#ff6b35";
     ctx.beginPath();
-    ctx.moveTo(10, 0);
-    ctx.lineTo(-6, -6);
-    ctx.lineTo(-6, 6);
+    ctx.moveTo(0, 0);
+    ctx.lineTo(-16, -6);
+    ctx.lineTo(-16, 6);
     ctx.closePath();
     ctx.fill();
 
@@ -204,10 +198,11 @@ export default class Ship {
     ctx.font = '12px "Courier New", monospace';
     ctx.fillStyle = "#ff6b35";
     ctx.textAlign = "center";
+    const {width} = ctx.measureText(`${Math.round(dist)}`);
     ctx.fillText(
       `${Math.round(dist)}`,
-      edgeX,
-      edgeY + (edgeY < cy ? 20 : -10),
+      edgeX - Math.cos(pointerAngle) * (20 + width / 2),
+      edgeY - Math.sin(pointerAngle) * (20 + width / 2),
     );
   }
 }
