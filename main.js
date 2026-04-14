@@ -1,0 +1,841 @@
+import Planet from './planet.js';
+
+
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+
+let W, H;
+function resize() {
+    W = canvas.width = window.innerWidth * devicePixelRatio;
+    H = canvas.height = window.innerHeight * devicePixelRatio;
+}
+resize();
+window.addEventListener('resize', resize);
+
+const G = 800;
+const THRUST_POWER = 40;
+const MIN_ORBIT_RADIUS = 80;
+
+const AUTO_CIRCULARIZE = false;
+
+
+
+let planets = [];
+let stars = [];
+function generateStars() {
+    stars = [];
+    for (let i = 0; i < 200; i++) {
+        stars.push({
+            x: Math.random() * W,
+            y: Math.random() * H,
+            size: Math.random() * 1.5 + 0.5,
+            alpha: Math.random() * 0.5 + 0.3
+        });
+    }
+}
+generateStars();
+
+function initPlanets() {
+    planets = [];
+    
+    const startX = W > H ? W * 0.25 : W * 0.5;
+    const startY = W > H ? H * 0.5 : H * 0.75;
+    planets.push(new Planet(startX, startY, 5000, '#00e5ff'));
+    
+    const targetX = W > H ? W * 0.75 : W * 0.5;
+    const targetY = W > H ? H * 0.5 : H * 0.25;
+    planets.push(new Planet(targetX, targetY, 4500, '#ff6b35'));
+}
+initPlanets();
+window.addEventListener('resize', () => { initPlanets(); generateStars(); repositionShip(); });
+
+function repositionShip() {
+    const dx = ship.x - planets.at(-2).x;
+    const dy = ship.y - planets.at(-2).y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const angle = Math.atan2(dy, dx);
+    const newDist = Math.max(MIN_ORBIT_RADIUS + 30, dist);
+    ship.x = planets.at(-2).x + Math.cos(angle) * newDist;
+    ship.y = planets.at(-2).y + Math.sin(angle) * newDist;
+}
+
+let ship = {
+    x: 0, y: 0,
+    vx: 0, vy: 0,
+    orbiting: planets.at(-2),
+    trail: [],
+    thrusting: false,
+    thrustDir: 1
+};
+
+function initShip() {
+    const orbitRadius = MIN_ORBIT_RADIUS + 30;
+    ship.x = planets.at(-2).x + orbitRadius;
+    ship.y = planets.at(-2).y;
+    const orbitalSpeed = Math.sqrt(G * planets.at(-2).mass / orbitRadius);
+    ship.vx = 0;
+    ship.vy = -orbitalSpeed;
+    ship.orbiting = planets.at(-2);
+    ship.trail = [];
+    ship.thrusting = false;
+    ship.thrustDir = 1;
+}
+initShip();
+
+let level = 1;
+let time = 0;
+let gameOver = false;
+let totalDeltaV = 0;
+let levelDeltaVs = {};
+let highScores = [];
+let offsetX = 0;
+
+function loadHighScores() {
+    const stored = localStorage.getItem('orbitHighScores');
+    if (stored) {
+        highScores = JSON.parse(stored);
+    }
+}
+
+function saveHighScore(lvl, dv) {
+    if (!highScores[lvl] || dv < highScores[lvl]) {
+        highScores[lvl] = dv;
+        localStorage.setItem('orbitHighScores', JSON.stringify(highScores));
+    }
+}
+
+loadHighScores();
+let offsetY = 0;
+let sliding = false;
+let slideProgress = 0;
+let slideStartX = 0;
+let slideStartY = 0;
+let slideTargetX = 0;
+let slideTargetY = 0;
+let perigeePos = null;
+let explosions = [];
+
+function createExplosion(x, y, color, radius) {
+    const particles = [];
+    for (let i = 0; i < 50; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 100 + Math.random() * 200;
+        particles.push({
+            x: x + Math.cos(angle) * radius,
+            y: y + Math.sin(angle) * radius,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            alpha: 1,
+            size: 3 + Math.random() * 6,
+            color: color
+        });
+    }
+    explosions.push({ particles, time: 0 });
+}
+
+function updateExplosions(dt) {
+    for (let i = explosions.length - 1; i >= 0; i--) {
+        const exp = explosions[i];
+        exp.time += dt;
+        
+        for (const p of exp.particles) {
+            p.x += p.vx * dt;
+            p.y += p.vy * dt;
+            p.vx *= 0.98;
+            p.vy *= 0.98;
+            p.alpha -= dt * 0.8;
+            p.size *= 0.99;
+        }
+        
+        if (exp.time > 1) {
+            explosions.splice(i, 1);
+        }
+    }
+}
+
+function drawExplosions() {
+    for (const exp of explosions) {
+        for (const p of exp.particles) {
+            if (p.alpha <= 0) continue;
+            const pos = worldToScreen(p.x, p.y);
+            ctx.globalAlpha = p.alpha;
+            ctx.fillStyle = p.color;
+            ctx.beginPath();
+            ctx.arc(pos.x, pos.y, p.size, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    }
+    ctx.globalAlpha = 1;
+}
+
+function generateRandomPlanet(refX, refY) {
+
+    let x, y;
+    if (W > H) {
+        x = refX + W * 0.25 + Math.random() * W * 0.35;
+        y = H * 0.2 + Math.random() * H * 0.6;
+    } else {
+        x = W * 0.2 + Math.random() * W * 0.6;
+        y = refY - H * 0.25 - Math.random() * H * 0.35;
+    }
+    
+    return new Planet(x, y);
+}
+
+function transitionToNextLevel() {
+    const oldOrbit = planets.at(-2);
+    const newOrbit = planets.at(-1);
+    
+    const slideOffsetX = oldOrbit.x - newOrbit.x;
+    const slideOffsetY = oldOrbit.y - newOrbit.y;
+    
+    slideStartX = offsetX;
+    slideStartY = offsetY;
+    slideTargetX = offsetX + slideOffsetX;
+    slideTargetY = offsetY + slideOffsetY;
+    slideProgress = 0;
+    sliding = true;
+    
+    createExplosion(oldOrbit.x, oldOrbit.y, oldOrbit.color, oldOrbit.radius);
+    
+    const newPlanet = generateRandomPlanet(newOrbit.x, newOrbit.y);
+    planets.push(newPlanet);
+    ship.orbiting = newOrbit;
+    sliding = true;
+    
+    levelDeltaVs[level] = totalDeltaV;
+    saveHighScore(level, totalDeltaV);
+    level++;
+
+    perigeePos = AUTO_CIRCULARIZE ? {
+        x: ship.orbiting.x,
+        y: ship.orbiting.y,
+    } : null;
+}
+     
+function getGravity(pos, body) {
+    const dx = body.x - pos.x;
+    const dy = body.y - pos.y;
+    const distSq = dx * dx + dy * dy;
+    const dist = Math.sqrt(distSq);
+    const force = G * body.mass / distSq;
+    return { ax: force * dx / dist, ay: force * dy / dist, dist, force, dist };
+}
+
+function worldToScreen(x, y) {
+    return { x: x + offsetX, y: y + offsetY };
+}
+
+function update(dt) {
+    updateExplosions(dt);
+    
+    if (sliding) {
+        slideProgress += dt;
+        if (slideProgress >= 1) {
+            slideProgress = 1;
+            sliding = false;
+        }
+        const t = slideProgress;
+        const ease = t * (2 - t);
+        offsetX = slideStartX + (slideTargetX - slideStartX) * ease;
+        offsetY = slideStartY + (slideTargetY - slideStartY) * ease;
+    }
+    
+    if (gameOver) {
+        return;
+    }
+    
+    time += dt;
+    
+    if (ship.thrusting) {
+        perigeePos = null;
+        
+        const speed = Math.sqrt(ship.vx * ship.vx + ship.vy * ship.vy);
+        if (speed > 0) {
+            const dv = THRUST_POWER * dt * ship.thrustDir;
+            ship.vx += (ship.vx / speed) * dv;
+            ship.vy += (ship.vy / speed) * dv;
+            const absDv = Math.abs(dv);
+            totalDeltaV += absDv;
+        }
+        
+        return;
+    }
+    
+    const body = ship.orbiting;
+
+    if (perigeePos) {
+        const distToPerigee = Math.sqrt(
+            Math.pow(ship.x - perigeePos.x, 2) + 
+            Math.pow(ship.y - perigeePos.y, 2)
+        );
+        if (distToPerigee < 15) {
+            const orbitDist = Math.sqrt(
+                Math.pow(ship.x - body.x, 2) + 
+                Math.pow(ship.y - body.y, 2)
+            );
+            const circularSpeed = Math.sqrt(G * body.mass / orbitDist);
+            const currentSpeed = Math.sqrt(ship.vx * ship.vx + ship.vy * ship.vy);
+            if (currentSpeed > circularSpeed) {
+                const dv = THRUST_POWER * dt;
+                ship.vx -= (ship.vx / currentSpeed) * dv;
+                ship.vy -= (ship.vy / currentSpeed) * dv;
+                totalDeltaV += dv;
+                return;
+            } else {
+                const scale = circularSpeed / currentSpeed;
+                ship.vx *= scale;
+                ship.vy *= scale;
+                perigeePos = null;
+            }
+        }
+    }
+    
+    const grav = getGravity(ship, body);
+    const targetGrav = getGravity(ship, planets.at(-1));
+    ship.vx += grav.ax * dt;
+    ship.vy += grav.ay * dt;
+    
+    ship.x += ship.vx * dt;
+    ship.y += ship.vy * dt;
+        
+    ship.trail.push({ x: ship.x, y: ship.y, alpha: 1 });
+    if (ship.trail.length > 60) ship.trail.shift();
+    ship.trail.forEach(p => p.alpha -= dt * 1.5);
+    
+    if(grav.dist < body.radius) {
+        gameOver = true;
+    } else if (targetGrav.force > grav.force && !sliding) {
+        transitionToNextLevel();
+    } 
+    
+    if (!gameOver && !sliding) {
+        const body = ship.orbiting;
+        const dx = ship.x - body.x;
+        const dy = ship.y - body.y;
+        const currentDist = Math.sqrt(dx * dx + dy * dy);
+        const speedSq = ship.vx * ship.vx + ship.vy * ship.vy;
+        
+        const rx = dx / currentDist;
+        const ry = dy / currentDist;
+        
+        const h = dx * ship.vy - dy * ship.vx;
+        const eVecX = (ship.vy * h) / (G * body.mass) - rx;
+        const eVecY = (-ship.vx * h) / (G * body.mass) - ry;
+        const e = Math.sqrt(eVecX * eVecX + eVecY * eVecY);
+        
+        if (e >= 1) {
+            const screenPos = worldToScreen(ship.x, ship.y);
+            if (screenPos.x < -100 || screenPos.x > W + 100 || screenPos.y < -100 || screenPos.y > H + 100) {
+                gameOver = true;
+            }
+        }
+    }
+}
+
+function drawGlow(x, y, radius, color, intensity = 1) {
+    const gradient = ctx.createRadialGradient(x, y, 0, x, y, radius * 2);
+    gradient.addColorStop(0, color);
+    gradient.addColorStop(0.4, color + '80');
+    gradient.addColorStop(1, 'transparent');
+    ctx.fillStyle = gradient;
+    ctx.globalAlpha = intensity;
+    ctx.beginPath();
+    ctx.arc(x, y, radius * 2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+}
+
+function drawPlanet(body) {
+    const pos = worldToScreen(body.x, body.y);
+    const pulse = Math.sin(time * 2) * 0.1 + 1;
+    
+    ctx.save();
+    ctx.shadowColor = body.color;
+    ctx.shadowBlur = 40 * pulse;
+    
+    const grad = ctx.createRadialGradient(pos.x - body.radius * 0.3, pos.y - body.radius * 0.3, 0, pos.x, pos.y, body.radius);
+    grad.addColorStop(0, body.color + 'ff');
+    grad.addColorStop(0.7, body.color + 'aa');
+    grad.addColorStop(1, body.color + '44');
+    
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(pos.x, pos.y, body.radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    
+    drawGlow(pos.x, pos.y, body.radius, body.color, 0.3);
+}
+
+function drawSOIs() {
+    if (level > 4) return;
+    
+    const p1 = planets.at(-2);
+    const p2 = planets.at(-1);
+    
+    const dx = p1.x - p2.x;
+    const dy = p1.y - p2.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    
+    const pos1 = worldToScreen(p1.x, p1.y);
+    const pos2 = worldToScreen(p2.x, p2.y);
+    const radius1 = (p1.mass / (p1.mass + p2.mass)) * dist;
+    const radius2 = (p2.mass / (p1.mass + p2.mass)) * dist;
+    const dir = Math.atan2(dy, dx);
+
+    const arcSize = Math.PI/5;
+    
+    ctx.globalAlpha = 0.4;
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(pos2.x, pos2.y, radius2, dir - arcSize, dir + arcSize);
+    ctx.stroke();
+    ctx.restore();
+    ctx.beginPath();
+    ctx.arc(pos1.x, pos1.y, radius1, dir + Math.PI - arcSize, dir + Math.PI + arcSize);
+    ctx.stroke();
+    ctx.restore();
+}
+
+function drawOrbitPath() {
+    const body = ship.orbiting;
+    if (!body) return;
+    
+    const dx = ship.x - body.x;
+    const dy = ship.y - body.y;
+    const currentDist = Math.sqrt(dx * dx + dy * dy);
+    const vx = ship.vx;
+    const vy = ship.vy;
+    const speedSq = vx * vx + vy * vy;
+    
+    const rx = dx / currentDist;
+    const ry = dy / currentDist;
+    
+    const h = dx * vy - dy * vx;
+    const eVecX = (vy * h) / (G * body.mass) - rx;
+    const eVecY = (-vx * h) / (G * body.mass) - ry;
+    const e = Math.sqrt(eVecX * eVecX + eVecY * eVecY);
+    
+    const a = (G * body.mass) / (2 * (G * body.mass) / currentDist - speedSq);
+    
+    const bodyPos = worldToScreen(body.x, body.y);
+    
+    if (a > 0 && e < 1 && e > 0.01) {
+        if(perigeePos){
+            const perigeeDist = a * (1 - e);
+            
+            perigeePos.x = body.x + (perigeeDist * eVecX / e);
+            perigeePos.y = body.y + (perigeeDist * eVecY / e);
+        }
+
+        const cx = body.x - a * eVecX;
+        const cy = body.y - a * eVecY;
+        const b = a * Math.sqrt(1 - e * e);
+        
+        const angle = Math.atan2(eVecY, eVecX);
+        
+        const centerPos = worldToScreen(cx, cy);
+        
+        ctx.strokeStyle = body.color + '80';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([8, 8]);
+        ctx.beginPath();
+        ctx.ellipse(centerPos.x, centerPos.y, a, b, angle, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+    } else if (e >= 1) {
+        ctx.strokeStyle = body.color + '80';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([4, 4]);
+        
+        const cx = body.x - a * eVecX;
+        const cy = body.y - a * eVecY;
+        const angle = Math.atan2(eVecY, eVecX);
+        const centerPos = worldToScreen(cx, cy);
+        
+        ctx.beginPath();
+        const semiMajor = Math.abs(a);
+        let move = true;
+        for (let i = -10; i <= 10; i++) {
+            const t = i * 0.2;
+            const r = semiMajor * (e * e - 1) / (1 + e * Math.cos(t));
+            const px = bodyPos.x + r * Math.cos(t + angle);
+            const py = bodyPos.y + r * Math.sin(t + angle);
+            if(px < -100 || px > W + 100 || py < -100 || py > H + 100) continue;
+            if (move) {
+                ctx.moveTo(px, py);
+                move = false;
+            } else {
+                ctx.lineTo(px, py);
+            }
+        }
+        ctx.stroke();
+        ctx.setLineDash([]);
+        
+        perigeePos = null;
+    } else {
+        ctx.strokeStyle = body.color + '80';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([8, 8]);
+        ctx.beginPath();
+        ctx.arc(bodyPos.x, bodyPos.y, currentDist, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        perigeePos = null;
+    }
+}
+
+function drawShipTrail() {
+    ship.trail.forEach((p, i) => {
+        if (p.alpha <= 0) return;
+        const pos = worldToScreen(p.x, p.y);
+        ctx.globalAlpha = p.alpha * 0.6;
+        ctx.fillStyle = '#00ffff';
+        ctx.beginPath();
+        ctx.arc(pos.x, pos.y, 2, 0, Math.PI * 2);
+        ctx.fill();
+    });
+    ctx.globalAlpha = 1;
+}
+
+function drawShip() {
+    const pos = worldToScreen(ship.x, ship.y);
+    const speed = Math.sqrt(ship.vx * ship.vx + ship.vy * ship.vy);
+    const angle = Math.atan2(ship.vy, ship.vx);
+    
+    ctx.save();
+    ctx.translate(pos.x, pos.y);
+    ctx.rotate(angle);
+    
+    if (ship.thrusting) {
+        ctx.shadowColor = ship.thrustDir < 0 ? '#ff6600' : '#00ff88';
+        ctx.shadowBlur = 20;
+        
+        const flameDir = ship.thrustDir;
+        const flameGrad = ctx.createLinearGradient(-20 * flameDir, 0, -8 * flameDir, 0);
+        flameGrad.addColorStop(0, 'transparent');
+        flameGrad.addColorStop(1, ship.thrustDir < 0 ? '#ff6600' : '#00ff88');
+        ctx.fillStyle = flameGrad;
+        ctx.beginPath();
+        ctx.moveTo(-6 * flameDir, -4);
+        ctx.lineTo(-18 * flameDir - Math.random() * 8, 0);
+        ctx.lineTo(-6 * flameDir, 4);
+        ctx.closePath();
+        ctx.fill();
+    }
+    
+    ctx.shadowColor = ship.thrusting ? (ship.thrustDir < 0 ? '#ff6600' : '#00ff88') : '#00ffff';
+    ctx.shadowBlur = ship.thrusting ? 15 : 10;
+    
+    ctx.fillStyle = ship.thrusting ? '#ffaa00' : '#ffffff';
+    ctx.beginPath();
+    ctx.moveTo(8, 0);
+    ctx.lineTo(-6, -5);
+    ctx.lineTo(-4, 0);
+    ctx.lineTo(-6, 5);
+    ctx.closePath();
+    ctx.fill();
+    
+    ctx.restore();
+}
+
+function drawPerigee() {
+    if (!perigeePos) return;
+    
+    const pos = worldToScreen(perigeePos.x, perigeePos.y);
+    const pulse = Math.sin(time * 5) * 0.3 + 0.7;
+    
+    ctx.fillStyle = '#ffff00';
+    ctx.globalAlpha = pulse;
+    ctx.beginPath();
+    ctx.arc(pos.x, pos.y, 6, 0, Math.PI * 2);
+    ctx.fill();
+    
+    ctx.strokeStyle = '#ffff00';
+    ctx.lineWidth = 2;
+    ctx.globalAlpha = pulse * 0.5;
+    ctx.beginPath();
+    ctx.arc(pos.x, pos.y, 12, 0, Math.PI * 2);
+    ctx.stroke();
+    
+    ctx.globalAlpha = 1;
+}
+
+function drawStars() {
+    stars.forEach(s => {
+        ctx.globalAlpha = s.alpha;
+        ctx.fillStyle = '#ffffff';
+        const x = (s.x - offsetX * 0.1 + W * 2) % W;
+        const y = (s.y - offsetY * 0.1 + H * 2) % H;
+        ctx.beginPath();
+        ctx.arc(x, y, s.size, 0, Math.PI * 2);
+        ctx.fill();
+    });
+    ctx.globalAlpha = 1;
+}
+
+function drawShipPointer() {
+    const pos = worldToScreen(ship.x, ship.y);
+    
+    if (pos.x >= 0 && pos.x <= W && pos.y >= 0 && pos.y <= H) return;
+    
+    const cx = W / 2;
+    const cy = H / 2;
+    const angle = Math.atan2(pos.y - cy, pos.x - cx);
+    
+    let edgeX, edgeY;
+    const margin = 20;
+    
+    if (pos.x < 0 || pos.x > W) {
+        if (pos.y < 0) {
+            const t = -cy / (pos.y - cy);
+            edgeX = cx + t * (pos.x - cx);
+            edgeY = -margin;
+        } else if (pos.y > H) {
+            const t = (H - cy) / (pos.y - cy);
+            edgeX = cx + t * (pos.x - cx);
+            edgeY = H + margin;
+        } else if (pos.x < 0) {
+            edgeX = -margin;
+            edgeY = pos.y;
+        } else {
+            edgeX = W + margin;
+            edgeY = pos.y;
+        }
+    } else if (pos.y < 0) {
+        edgeX = pos.x;
+        edgeY = -margin;
+    } else if (pos.y > H) {
+        edgeX = pos.x;
+        edgeY = H + margin;
+    }
+    
+    edgeX = Math.max(margin, Math.min(W - margin, edgeX));
+    edgeY = Math.max(margin, Math.min(H - margin, edgeY));
+    
+    const pointerAngle = Math.atan2(edgeY - cy, edgeX - cx);
+    
+    ctx.save();
+    ctx.translate(edgeX, edgeY);
+    ctx.rotate(pointerAngle);
+    
+    ctx.fillStyle = '#ff6b35';
+    ctx.beginPath();
+    ctx.moveTo(10, 0);
+    ctx.lineTo(-6, -6);
+    ctx.lineTo(-6, 6);
+    ctx.closePath();
+    ctx.fill();
+    
+    ctx.restore();
+    
+    const dist = Math.sqrt(
+        Math.pow(ship.x - ship.orbiting.x, 2) + 
+        Math.pow(ship.y - ship.orbiting.y, 2)
+    );
+    
+    ctx.font = '12px "Courier New", monospace';
+    ctx.fillStyle = '#ff6b35';
+    ctx.textAlign = 'center';
+    ctx.fillText(`${Math.round(dist)}`, edgeX, edgeY + (edgeY < H / 2 ? 20 : -10));
+}
+
+function drawUI() {
+    drawShipPointer();
+    
+    ctx.font = '14px "Courier New", monospace';
+    ctx.fillStyle = '#00e5ff';
+    ctx.textAlign = 'right';
+    ctx.fillText(`DV: ${Math.round(totalDeltaV)}`, W - 20, 30);
+    ctx.fillText(`LEVEL ${level}`, W - 20, 50);
+    ctx.textAlign = 'left';
+    
+    if (!gameOver) {
+        ctx.font = '12px "Courier New", monospace';
+        ctx.fillStyle = '#ff6600';
+        ctx.globalAlpha = 0.5;
+        ctx.textAlign = 'left';
+        ctx.fillText('◄ RETRO', 20, H - 40);
+        
+        ctx.fillStyle = '#00ff88';
+        ctx.textAlign = 'right';
+        ctx.fillText('PROGRADE ►', W - 20, H - 40);
+        ctx.globalAlpha = 1;
+    }
+    
+    if (level === 1 && !gameOver) {
+        ctx.font = '12px "Courier New", monospace';
+        ctx.fillStyle = '#aaaaaa';
+        ctx.globalAlpha = 0.7;
+        ctx.textAlign = 'center';
+        ctx.fillText('TAP LEFT TO BURN RETROGRADE', W / 2, H - 85);
+        ctx.fillText('TAP RIGHT TO BURN PROGRADE', W / 2, H - 70);
+        ctx.globalAlpha = 1;
+    }
+}
+
+function drawWinMessage() {
+    ctx.fillStyle = '#ff6b35';
+    ctx.font = 'bold 36px "Courier New", monospace';
+    ctx.textAlign = 'center';
+    ctx.shadowColor = '#ff6b35';
+    ctx.shadowBlur = 20;
+    ctx.fillText('ORBIT ESTABLISHED!', W / 2, H / 2 - 20);
+    ctx.shadowBlur = 0;
+    
+    ctx.font = '18px "Courier New", monospace';
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(`Level ${level}`, W / 2, H / 2 + 25);
+}
+
+function drawGameOver() {
+    ctx.fillStyle = '#ff3535';
+    ctx.font = 'bold 36px "Courier New", monospace';
+    ctx.textAlign = 'center';
+    ctx.shadowColor = '#ff3535';
+    ctx.shadowBlur = 20;
+    ctx.fillText('GAME OVER', W / 2, 50);
+    ctx.shadowBlur = 0;
+    
+    ctx.font = '16px "Courier New", monospace';
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(`Highest Level: ${level}`, W / 2, 90);
+    
+    const tableStartY = 130;
+    const col1X = W / 2 - 80;
+    const col2X = W / 2 + 40;
+    const col3X = W / 2 + 100;
+    
+    ctx.font = 'bold 14px "Courier New", monospace';
+    ctx.fillStyle = '#00e5ff';
+    ctx.fillText('LEVEL', col1X, tableStartY);
+    ctx.fillText('BEST', col2X, tableStartY);
+    ctx.fillText('RUN', col3X, tableStartY);
+    
+    ctx.strokeStyle = '#00e5ff';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(W / 2 - 120, tableStartY + 10);
+    ctx.lineTo(W / 2 + 120, tableStartY + 10);
+    ctx.stroke();
+    
+    ctx.font = '14px "Courier New", monospace';
+    const maxLevels = Math.max(level, highScores.length);
+    let y = tableStartY + 25;
+    for (let i = maxLevels; i > 1; i--) {
+        const best = highScores[i] || 0;
+        const run = levelDeltaVs[i] || 0;
+        const isCurrent = i === level;
+        ctx.fillStyle = isCurrent ? '#ff6b35' : '#aaaaaa';
+        ctx.fillText(i.toString(), col1X, y);
+        ctx.fillStyle = isCurrent ? '#00ff88' : '#666666';
+        ctx.fillText(Math.round(best).toString(), col2X, y);
+        ctx.fillStyle = isCurrent ? '#ff6b35' : '#aaaaaa';
+        ctx.fillText(run > 0 ? Math.round(run).toString() : '-', col3X, y);
+        y += 20;
+    }
+    
+    ctx.font = '14px "Courier New", monospace';
+    ctx.fillStyle = '#666666';
+    ctx.fillText('Click to restart', W / 2, H - 30);
+}
+
+function resetGame() {
+    initPlanets();
+    initShip();
+    level = 1;
+    gameOver = false;
+    totalDeltaV = 0;
+    levelDeltaVs = {};
+    offsetX = 0;
+    offsetY = 0;
+    sliding = false;
+    slideProgress = 0;
+    perigeePos = null;
+}
+
+let lastTime = 0;
+let dt = 0.016;
+function gameLoop(timestamp) {
+    dt = Math.min((timestamp - lastTime) / 1000, 0.05);
+    lastTime = timestamp;
+    
+    ctx.fillStyle = '#0a0a12';
+    ctx.fillRect(0, 0, W, H);
+    
+    drawStars();
+    drawOrbitPath();
+    drawSOIs();
+    planets.forEach(p => drawPlanet(p));
+    drawExplosions();
+    drawShipTrail();
+    drawShip();
+    drawPerigee();
+    drawUI();
+    
+    if (gameOver) {
+        drawGameOver();
+    }
+    
+    update(dt);
+    requestAnimationFrame(gameLoop);
+}
+
+function handleStart(e) {
+    e.preventDefault();
+    if (gameOver) {
+        resetGame();
+        return;
+    }
+    
+    let clientX;
+    if (e.touches) {
+        clientX = e.touches[0].clientX;
+    } else {
+        clientX = e.clientX;
+    }
+    
+    ship.thrusting = true;
+    ship.thrustDir = clientX < W / 2 ? -1 : 1;
+}
+
+function handleEnd(e) {
+    e.preventDefault();
+    ship.thrusting = false;
+}
+
+canvas.addEventListener('mousedown', handleStart);
+canvas.addEventListener('mouseup', handleEnd);
+canvas.addEventListener('mouseleave', handleEnd);
+canvas.addEventListener('touchstart', handleStart, { passive: false });
+canvas.addEventListener('touchend', handleEnd, { passive: false });
+canvas.addEventListener('touchcancel', handleEnd, { passive: false });
+
+function handleKeyDown(e) {
+    if (gameOver) {
+        resetGame();
+        return;
+    }
+    
+    if (e.code === 'ArrowLeft' || e.code === 'KeyA' || e.code === 'KeyQ') {
+        ship.thrusting = true;
+        ship.thrustDir = -1;
+    } else if (e.code === 'ArrowRight' || e.code === 'KeyD' || e.code === 'KeyW') {
+        ship.thrusting = true;
+        ship.thrustDir = 1;
+    }
+}
+
+function handleKeyUp(e) {
+    if (e.code === 'ArrowLeft' || e.code === 'KeyA' || e.code === 'KeyQ' || 
+        e.code === 'ArrowRight' || e.code === 'KeyD' || e.code === 'KeyW') {
+        ship.thrusting = false;
+    }
+}
+
+window.addEventListener('keydown', handleKeyDown);
+window.addEventListener('keyup', handleKeyUp);
+
+requestAnimationFrame(gameLoop);
