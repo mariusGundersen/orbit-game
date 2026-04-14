@@ -1,4 +1,5 @@
 import Planet from './planet.js';
+import Ship from './ship.js';
 
 
 const canvas = document.getElementById('game');
@@ -12,14 +13,13 @@ function resize() {
 resize();
 window.addEventListener('resize', resize);
 
-const G = 800;
+export const G = 800;
 const THRUST_POWER = 40;
-const MIN_ORBIT_RADIUS = 80;
 
 const AUTO_CIRCULARIZE = false;
 
 
-
+/** @type {Planet[]} */
 let planets = [];
 let stars = [];
 function generateStars() {
@@ -47,45 +47,16 @@ function initPlanets() {
     planets.push(new Planet(targetX, targetY, 4500, '#ff6b35'));
 }
 initPlanets();
-window.addEventListener('resize', () => { initPlanets(); generateStars(); repositionShip(); });
 
-function repositionShip() {
-    const dx = ship.x - planets.at(-2).x;
-    const dy = ship.y - planets.at(-2).y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    const angle = Math.atan2(dy, dx);
-    const newDist = Math.max(MIN_ORBIT_RADIUS + 30, dist);
-    ship.x = planets.at(-2).x + Math.cos(angle) * newDist;
-    ship.y = planets.at(-2).y + Math.sin(angle) * newDist;
+let ship = new Ship(planets.at(-2), planets.at(-1));
+
+function initShip(orbiting, target) {
+    ship = new Ship(orbiting, target);
 }
-
-let ship = {
-    x: 0, y: 0,
-    vx: 0, vy: 0,
-    orbiting: planets.at(-2),
-    trail: [],
-    thrusting: false,
-    thrustDir: 1
-};
-
-function initShip() {
-    const orbitRadius = MIN_ORBIT_RADIUS + 30;
-    ship.x = planets.at(-2).x + orbitRadius;
-    ship.y = planets.at(-2).y;
-    const orbitalSpeed = Math.sqrt(G * planets.at(-2).mass / orbitRadius);
-    ship.vx = 0;
-    ship.vy = -orbitalSpeed;
-    ship.orbiting = planets.at(-2);
-    ship.trail = [];
-    ship.thrusting = false;
-    ship.thrustDir = 1;
-}
-initShip();
 
 let level = 1;
 let time = 0;
 let gameOver = false;
-let totalDeltaV = 0;
 let levelDeltaVs = {};
 let highScores = [];
 let offsetX = 0;
@@ -183,8 +154,8 @@ function generateRandomPlanet(refX, refY) {
 }
 
 function transitionToNextLevel() {
-    const oldOrbit = planets.at(-2);
-    const newOrbit = planets.at(-1);
+    const oldOrbit = ship.orbiting;
+    const newOrbit = ship.target;
     
     const slideOffsetX = oldOrbit.x - newOrbit.x;
     const slideOffsetY = oldOrbit.y - newOrbit.y;
@@ -200,26 +171,18 @@ function transitionToNextLevel() {
     
     const newPlanet = generateRandomPlanet(newOrbit.x, newOrbit.y);
     planets.push(newPlanet);
+    ship.target = newPlanet;
     ship.orbiting = newOrbit;
     sliding = true;
     
-    levelDeltaVs[level] = totalDeltaV;
-    saveHighScore(level, totalDeltaV);
+    levelDeltaVs[level] = ship.consumedDeltaV;
+    saveHighScore(level, ship.consumedDeltaV);
     level++;
 
     perigeePos = AUTO_CIRCULARIZE ? {
         x: ship.orbiting.x,
         y: ship.orbiting.y,
     } : null;
-}
-     
-function getGravity(pos, body) {
-    const dx = body.x - pos.x;
-    const dy = body.y - pos.y;
-    const distSq = dx * dx + dy * dy;
-    const dist = Math.sqrt(distSq);
-    const force = G * body.mass / distSq;
-    return { ax: force * dx / dist, ay: force * dy / dist, dist, force, dist };
 }
 
 export function worldToScreen(x, y) {
@@ -247,18 +210,8 @@ function update(dt) {
     
     time += dt;
     
-    if (ship.thrusting) {
+    if(ship.thrust(dt)){
         perigeePos = null;
-        
-        const speed = Math.sqrt(ship.vx * ship.vx + ship.vy * ship.vy);
-        if (speed > 0) {
-            const dv = THRUST_POWER * dt * ship.thrustDir;
-            ship.vx += (ship.vx / speed) * dv;
-            ship.vy += (ship.vy / speed) * dv;
-            const absDv = Math.abs(dv);
-            totalDeltaV += absDv;
-        }
-        
         return;
     }
     
@@ -277,10 +230,7 @@ function update(dt) {
             const circularSpeed = Math.sqrt(G * body.mass / orbitDist);
             const currentSpeed = Math.sqrt(ship.vx * ship.vx + ship.vy * ship.vy);
             if (currentSpeed > circularSpeed) {
-                const dv = THRUST_POWER * dt;
-                ship.vx -= (ship.vx / currentSpeed) * dv;
-                ship.vy -= (ship.vy / currentSpeed) * dv;
-                totalDeltaV += dv;
+                ship.thrust(dt, 1);
                 return;
             } else {
                 const scale = circularSpeed / currentSpeed;
@@ -291,17 +241,15 @@ function update(dt) {
         }
     }
     
-    const grav = getGravity(ship, body);
-    const targetGrav = getGravity(ship, planets.at(-1));
+    const grav = ship.orbiting.calculateForceOnObject(ship);
+    const targetGrav = ship.target.calculateForceOnObject(ship);
     ship.vx += grav.ax * dt;
     ship.vy += grav.ay * dt;
     
     ship.x += ship.vx * dt;
     ship.y += ship.vy * dt;
-        
-    ship.trail.push({ x: ship.x, y: ship.y, alpha: 1 });
-    if (ship.trail.length > 60) ship.trail.shift();
-    ship.trail.forEach(p => p.alpha -= dt * 1.5);
+    
+    ship.trail.unshift({ x: ship.x, y: ship.y, time });
     
     if(grav.dist < body.radius) {
         gameOver = true;
@@ -336,8 +284,8 @@ function update(dt) {
 function drawSOIs() {
     if (level > 4) return;
     
-    const p1 = planets.at(-2);
-    const p2 = planets.at(-1);
+    const p1 = ship.orbiting;
+    const p2 = ship.target;
     
     const dx = p1.x - p2.x;
     const dy = p1.y - p2.y;
@@ -452,60 +400,6 @@ function drawOrbitPath() {
     }
 }
 
-function drawShipTrail() {
-    ship.trail.forEach((p, i) => {
-        if (p.alpha <= 0) return;
-        const pos = worldToScreen(p.x, p.y);
-        ctx.globalAlpha = p.alpha * 0.6;
-        ctx.fillStyle = '#00ffff';
-        ctx.beginPath();
-        ctx.arc(pos.x, pos.y, 2, 0, Math.PI * 2);
-        ctx.fill();
-    });
-    ctx.globalAlpha = 1;
-}
-
-function drawShip() {
-    const pos = worldToScreen(ship.x, ship.y);
-    const speed = Math.sqrt(ship.vx * ship.vx + ship.vy * ship.vy);
-    const angle = Math.atan2(ship.vy, ship.vx);
-    
-    ctx.save();
-    ctx.translate(pos.x, pos.y);
-    ctx.rotate(angle);
-    
-    if (ship.thrusting) {
-        ctx.shadowColor = ship.thrustDir < 0 ? '#ff6600' : '#00ff88';
-        ctx.shadowBlur = 20;
-        
-        const flameDir = ship.thrustDir;
-        const flameGrad = ctx.createLinearGradient(-20 * flameDir, 0, -8 * flameDir, 0);
-        flameGrad.addColorStop(0, 'transparent');
-        flameGrad.addColorStop(1, ship.thrustDir < 0 ? '#ff6600' : '#00ff88');
-        ctx.fillStyle = flameGrad;
-        ctx.beginPath();
-        ctx.moveTo(-6 * flameDir, -4);
-        ctx.lineTo(-18 * flameDir - Math.random() * 8, 0);
-        ctx.lineTo(-6 * flameDir, 4);
-        ctx.closePath();
-        ctx.fill();
-    }
-    
-    ctx.shadowColor = ship.thrusting ? (ship.thrustDir < 0 ? '#ff6600' : '#00ff88') : '#00ffff';
-    ctx.shadowBlur = ship.thrusting ? 15 : 10;
-    
-    ctx.fillStyle = ship.thrusting ? '#ffaa00' : '#ffffff';
-    ctx.beginPath();
-    ctx.moveTo(8, 0);
-    ctx.lineTo(-6, -5);
-    ctx.lineTo(-4, 0);
-    ctx.lineTo(-6, 5);
-    ctx.closePath();
-    ctx.fill();
-    
-    ctx.restore();
-}
-
 function drawPerigee() {
     if (!perigeePos) return;
     
@@ -541,79 +435,11 @@ function drawStars() {
     ctx.globalAlpha = 1;
 }
 
-function drawShipPointer() {
-    const pos = worldToScreen(ship.x, ship.y);
-    
-    if (pos.x >= 0 && pos.x <= W && pos.y >= 0 && pos.y <= H) return;
-    
-    const cx = W / 2;
-    const cy = H / 2;
-    const angle = Math.atan2(pos.y - cy, pos.x - cx);
-    
-    let edgeX, edgeY;
-    const margin = 20;
-    
-    if (pos.x < 0 || pos.x > W) {
-        if (pos.y < 0) {
-            const t = -cy / (pos.y - cy);
-            edgeX = cx + t * (pos.x - cx);
-            edgeY = -margin;
-        } else if (pos.y > H) {
-            const t = (H - cy) / (pos.y - cy);
-            edgeX = cx + t * (pos.x - cx);
-            edgeY = H + margin;
-        } else if (pos.x < 0) {
-            edgeX = -margin;
-            edgeY = pos.y;
-        } else {
-            edgeX = W + margin;
-            edgeY = pos.y;
-        }
-    } else if (pos.y < 0) {
-        edgeX = pos.x;
-        edgeY = -margin;
-    } else if (pos.y > H) {
-        edgeX = pos.x;
-        edgeY = H + margin;
-    }
-    
-    edgeX = Math.max(margin, Math.min(W - margin, edgeX));
-    edgeY = Math.max(margin, Math.min(H - margin, edgeY));
-    
-    const pointerAngle = Math.atan2(edgeY - cy, edgeX - cx);
-    
-    ctx.save();
-    ctx.translate(edgeX, edgeY);
-    ctx.rotate(pointerAngle);
-    
-    ctx.fillStyle = '#ff6b35';
-    ctx.beginPath();
-    ctx.moveTo(10, 0);
-    ctx.lineTo(-6, -6);
-    ctx.lineTo(-6, 6);
-    ctx.closePath();
-    ctx.fill();
-    
-    ctx.restore();
-    
-    const dist = Math.sqrt(
-        Math.pow(ship.x - ship.orbiting.x, 2) + 
-        Math.pow(ship.y - ship.orbiting.y, 2)
-    );
-    
-    ctx.font = '12px "Courier New", monospace';
-    ctx.fillStyle = '#ff6b35';
-    ctx.textAlign = 'center';
-    ctx.fillText(`${Math.round(dist)}`, edgeX, edgeY + (edgeY < H / 2 ? 20 : -10));
-}
-
-function drawUI() {
-    drawShipPointer();
-    
+function drawUI() {    
     ctx.font = '14px "Courier New", monospace';
     ctx.fillStyle = '#00e5ff';
     ctx.textAlign = 'right';
-    ctx.fillText(`DV: ${Math.round(totalDeltaV)}`, W - 20, 30);
+    ctx.fillText(`DV: ${Math.round(ship.consumedDeltaV)}`, W - 20, 30);
     ctx.fillText(`LEVEL ${level}`, W - 20, 50);
     ctx.textAlign = 'left';
     
@@ -709,10 +535,9 @@ function drawGameOver() {
 
 function resetGame() {
     initPlanets();
-    initShip();
+    initShip(planets.at(-2), planets.at(-1));
     level = 1;
     gameOver = false;
-    totalDeltaV = 0;
     levelDeltaVs = {};
     offsetX = 0;
     offsetY = 0;
@@ -733,10 +558,9 @@ function gameLoop(timestamp) {
     drawStars();
     drawOrbitPath();
     drawSOIs();
-    planets.forEach(p => p.draw(ctx, time));
+    planets.slice(-3).forEach(p => p.draw(ctx, time));
     drawExplosions();
-    drawShipTrail();
-    drawShip();
+    ship.draw(ctx, time);
     drawPerigee();
     drawUI();
     
@@ -755,13 +579,12 @@ function handleStart(e) {
         return;
     }
     
-    ship.thrusting = true;
-    ship.thrustDir = e.clientX*devicePixelRatio < W / 2 ? -1 : 1;
+    ship.setThrust(e.clientX*devicePixelRatio < W / 2 ? -1 : 1);
 }
 
 function handleEnd(e) {
     e.preventDefault();
-    ship.thrusting = false;
+    ship.setThrust(0);
 }
 
 canvas.addEventListener('pointerdown', handleStart);
@@ -775,18 +598,16 @@ function handleKeyDown(e) {
     }
     
     if (e.code === 'ArrowLeft' || e.code === 'KeyA' || e.code === 'KeyQ') {
-        ship.thrusting = true;
-        ship.thrustDir = -1;
+        ship.setThrust(-1);
     } else if (e.code === 'ArrowRight' || e.code === 'KeyD' || e.code === 'KeyW') {
-        ship.thrusting = true;
-        ship.thrustDir = 1;
+        ship.setThrust(1);
     }
 }
 
 function handleKeyUp(e) {
     if (e.code === 'ArrowLeft' || e.code === 'KeyA' || e.code === 'KeyQ' || 
         e.code === 'ArrowRight' || e.code === 'KeyD' || e.code === 'KeyW') {
-        ship.thrusting = false;
+        ship.setThrust(0);
     }
 }
 

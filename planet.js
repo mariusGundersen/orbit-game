@@ -1,6 +1,6 @@
 // @ts-check
 
-import { worldToScreen } from "./main.js";
+import { G, worldToScreen } from "./main.js";
 
 export default class Planet {
   static DENSITY = 80;
@@ -44,27 +44,21 @@ export default class Planet {
     return (35 + Math.random() * 30) * Planet.DENSITY;
   }
 
-  /**
-   * @param {CanvasRenderingContext2D} ctx
-   */
-  drawGlow(ctx, intensity = 1) {
-    const gradient = ctx.createRadialGradient(
-      this.x,
-      this.y,
-      0,
-      this.x,
-      this.y,
-      this.radius * 2,
-    );
-    gradient.addColorStop(0, this.color);
-    gradient.addColorStop(0.4, this.color + "80");
-    gradient.addColorStop(1, "transparent");
-    ctx.fillStyle = gradient;
-    ctx.globalAlpha = intensity;
-    ctx.beginPath();
-    ctx.arc(this.x, this.y, this.radius * 2, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.globalAlpha = 1;
+    /**
+     * @param {{ x: number; y: number; }} pos
+     */
+    calculateForceOnObject(pos) {
+      const dx = this.x - pos.x;
+      const dy = this.y - pos.y;
+      const distSq = dx * dx + dy * dy;
+      const dist = Math.sqrt(distSq);
+      const force = G * this.mass / distSq;
+      return { 
+        ax: force * dx / dist, 
+        ay: force * dy / dist, 
+        dist, 
+        force 
+    };
   }
 
   /**
@@ -97,6 +91,22 @@ export default class Planet {
     ctx.fill();
     ctx.restore();
 
-    this.drawGlow(ctx, 0.3);
+    const gradient = ctx.createRadialGradient(
+      pos.x,
+      pos.y,
+      0,
+      pos.x,
+      pos.y,
+      this.radius * 2,
+    );
+    gradient.addColorStop(0, this.color);
+    gradient.addColorStop(0.4, this.color + "80");
+    gradient.addColorStop(1, "transparent");
+    ctx.fillStyle = gradient;
+    ctx.globalAlpha = 0.3;
+    ctx.beginPath();
+    ctx.arc(pos.x, pos.y, this.radius * 2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
   }
 }
