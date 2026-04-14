@@ -222,7 +222,7 @@ function getGravity(pos, body) {
     return { ax: force * dx / dist, ay: force * dy / dist, dist, force, dist };
 }
 
-function worldToScreen(x, y) {
+export function worldToScreen(x, y) {
     return { x: x + offsetX, y: y + offsetY };
 }
 
@@ -331,41 +331,6 @@ function update(dt) {
             }
         }
     }
-}
-
-function drawGlow(x, y, radius, color, intensity = 1) {
-    const gradient = ctx.createRadialGradient(x, y, 0, x, y, radius * 2);
-    gradient.addColorStop(0, color);
-    gradient.addColorStop(0.4, color + '80');
-    gradient.addColorStop(1, 'transparent');
-    ctx.fillStyle = gradient;
-    ctx.globalAlpha = intensity;
-    ctx.beginPath();
-    ctx.arc(x, y, radius * 2, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.globalAlpha = 1;
-}
-
-function drawPlanet(body) {
-    const pos = worldToScreen(body.x, body.y);
-    const pulse = Math.sin(time * 2) * 0.1 + 1;
-    
-    ctx.save();
-    ctx.shadowColor = body.color;
-    ctx.shadowBlur = 40 * pulse;
-    
-    const grad = ctx.createRadialGradient(pos.x - body.radius * 0.3, pos.y - body.radius * 0.3, 0, pos.x, pos.y, body.radius);
-    grad.addColorStop(0, body.color + 'ff');
-    grad.addColorStop(0.7, body.color + 'aa');
-    grad.addColorStop(1, body.color + '44');
-    
-    ctx.fillStyle = grad;
-    ctx.beginPath();
-    ctx.arc(pos.x, pos.y, body.radius, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-    
-    drawGlow(pos.x, pos.y, body.radius, body.color, 0.3);
 }
 
 function drawSOIs() {
@@ -768,7 +733,7 @@ function gameLoop(timestamp) {
     drawStars();
     drawOrbitPath();
     drawSOIs();
-    planets.forEach(p => drawPlanet(p));
+    planets.forEach(p => p.draw(ctx, time));
     drawExplosions();
     drawShipTrail();
     drawShip();
@@ -790,15 +755,8 @@ function handleStart(e) {
         return;
     }
     
-    let clientX;
-    if (e.touches) {
-        clientX = e.touches[0].clientX;
-    } else {
-        clientX = e.clientX;
-    }
-    
     ship.thrusting = true;
-    ship.thrustDir = clientX < W / 2 ? -1 : 1;
+    ship.thrustDir = e.clientX*devicePixelRatio < W / 2 ? -1 : 1;
 }
 
 function handleEnd(e) {
@@ -806,12 +764,9 @@ function handleEnd(e) {
     ship.thrusting = false;
 }
 
-canvas.addEventListener('mousedown', handleStart);
-canvas.addEventListener('mouseup', handleEnd);
-canvas.addEventListener('mouseleave', handleEnd);
-canvas.addEventListener('touchstart', handleStart, { passive: false });
-canvas.addEventListener('touchend', handleEnd, { passive: false });
-canvas.addEventListener('touchcancel', handleEnd, { passive: false });
+canvas.addEventListener('pointerdown', handleStart);
+canvas.addEventListener('pointerup', handleEnd);
+canvas.addEventListener('pointerleave', handleEnd);
 
 function handleKeyDown(e) {
     if (gameOver) {
