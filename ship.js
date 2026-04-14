@@ -34,7 +34,7 @@ export default class Ship {
   get distanceToPlanet() {
     return Math.sqrt(
       Math.pow(this.x - this.orbiting.x, 2) +
-        Math.pow(this.y - this.orbiting.y, 2),
+      Math.pow(this.y - this.orbiting.y, 2),
     );
   }
 
@@ -147,40 +147,41 @@ export default class Ship {
     const W = ctx.canvas.width;
     const H = ctx.canvas.height;
 
-    const cx = W / 2;
-    const cy = H / 2;
-
-    let edgeX, edgeY;
     const margin = 20;
+    let edgeX, edgeY;
 
-    if (pos.x < 0 || pos.x > W) {
-      if (pos.y < 0) {
-        const t = -cy / (pos.y - cy);
-        edgeX = cx + t * (pos.x - cx);
-        edgeY = -margin;
-      } else if (pos.y > H) {
-        const t = (H - cy) / (pos.y - cy);
-        edgeX = cx + t * (pos.x - cx);
-        edgeY = H + margin;
-      } else if (pos.x < 0) {
-        edgeX = -margin;
-        edgeY = pos.y;
+    if (pos.x < margin) {
+      edgeX = margin;
+      if (pos.y < margin) {
+        edgeY = margin;
+      } else if (pos.y > H - margin) {
+        edgeY = H - margin;
       } else {
-        edgeX = W + margin;
         edgeY = pos.y;
       }
-    } else if (pos.y < 0) {
+    } else if (pos.x > W - margin) {
+      edgeX = W - margin;
+      if (pos.y < margin) {
+        edgeY = margin;
+      } else if (pos.y > H - margin) {
+        edgeY = H - margin;
+      } else {
+        edgeY = pos.y;
+      }
+    } else if (pos.y < margin) {
+      edgeY = margin;
       edgeX = pos.x;
-      edgeY = -margin;
-    } else if (pos.y > H) {
+    } else if (pos.y > H - margin) {
+      edgeY = H - margin;
       edgeX = pos.x;
-      edgeY = H + margin;
     } else {
       return;
     }
 
-    edgeX = Math.max(margin, Math.min(W - margin, edgeX));
-    edgeY = Math.max(margin, Math.min(H - margin, edgeY));
+    const planetPos = worldToScreen(this.orbiting.x, this.orbiting.y);
+
+    const cx = planetPos.x;
+    const cy = planetPos.y;
 
     const pointerAngle = Math.atan2(edgeY - cy, edgeX - cx);
 
@@ -206,7 +207,7 @@ export default class Ship {
     ctx.fillText(
       `${Math.round(dist)}`,
       edgeX,
-      edgeY + (edgeY < H / 2 ? 20 : -10),
+      edgeY + (edgeY < cy ? 20 : -10),
     );
   }
 }
