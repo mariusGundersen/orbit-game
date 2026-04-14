@@ -65,9 +65,9 @@ export default class Ship {
 
   /**
    * @param {CanvasRenderingContext2D} ctx
-   * @param {number} time
+   * @param {number} [maxTrailAge]
    */
-  draw(ctx, time) {
+  draw(ctx, maxTrailAge) {
     const pos = worldToScreen(this.x, this.y);
     const angle = Math.atan2(this.vy, this.vx);
 
@@ -115,23 +115,23 @@ export default class Ship {
     ctx.fill();
 
     ctx.restore();
-    this.drawTrail(ctx, time);
+    this.drawTrail(ctx, maxTrailAge);
     this.drawPointer(ctx);
   }
 
   /**
    * @param {CanvasRenderingContext2D} ctx
-   * @param {number} time
+   * @param {number} maxTrailAge
    */
-  drawTrail(ctx, time) {
+  drawTrail(ctx, maxTrailAge = MAX_TRAIL_AGE) {
     ctx.fillStyle = "#00ffff";
     let i = 0;
     for (const p of this.trail) {
       i++;
       if ((this.trail.length - i) % TRAIL_PERIODICITY !== 0) continue;
-      if (i > MAX_TRAIL_AGE) break;
+      if (i > maxTrailAge) break;
       const pos = worldToScreen(p.x, p.y);
-      ctx.globalAlpha = 1 - i / MAX_TRAIL_AGE;
+      ctx.globalAlpha = 1 - i / maxTrailAge;
       ctx.beginPath();
       ctx.arc(pos.x, pos.y, 2, 0, Math.PI * 2);
       ctx.fill();
@@ -147,11 +147,8 @@ export default class Ship {
     const W = ctx.canvas.width;
     const H = ctx.canvas.height;
 
-    if (pos.x >= 0 && pos.x <= W && pos.y >= 0 && pos.y <= H) return;
-
     const cx = W / 2;
     const cy = H / 2;
-    const angle = Math.atan2(pos.y - cy, pos.x - cx);
 
     let edgeX, edgeY;
     const margin = 20;
@@ -178,6 +175,8 @@ export default class Ship {
     } else if (pos.y > H) {
       edgeX = pos.x;
       edgeY = H + margin;
+    } else {
+      return;
     }
 
     edgeX = Math.max(margin, Math.min(W - margin, edgeX));

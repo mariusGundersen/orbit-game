@@ -57,6 +57,9 @@ function initShip(orbiting, target) {
 let level = 1;
 let time = 0;
 let gameOver = false;
+let zoomOutFactor = 1;
+let zoomOutTarget = 1;
+let zoomOutStart = 1;
 let levelDeltaVs = {};
 let highScores = [];
 let offsetX = 0;
@@ -186,7 +189,53 @@ function transitionToNextLevel() {
 }
 
 export function worldToScreen(x, y) {
-    return { x: x + offsetX, y: y + offsetY };
+    const cx = W / 2;
+    const cy = H / 2;
+    return { 
+        x: cx + (x + offsetX - cx) * zoomOutFactor, 
+        y: cy + (y + offsetY - cy) * zoomOutFactor 
+    };
+}
+
+function endGame(){
+    gameOver = true;
+
+    const orbitedPlanets = planets.slice(0, -1);
+    
+    const minX = Math.min(...orbitedPlanets.map(p => p.x));
+    const maxX = Math.max(...orbitedPlanets.map(p => p.x));
+    const minY = Math.min(...orbitedPlanets.map(p => p.y));
+    const maxY = Math.max(...orbitedPlanets.map(p => p.y));
+    
+    const trailX = ship.trail.map(t => t.x);
+    const trailY = ship.trail.map(t => t.y);
+    const trailMinX = trailX.length ? Math.min(...trailX) : 0;
+    const trailMaxX = trailX.length ? Math.max(...trailX) : 0;
+    const trailMinY = trailY.length ? Math.min(...trailY) : 0;
+    const trailMaxY = trailY.length ? Math.max(...trailY) : 0;
+    
+    const contentMinX = Math.min(minX, trailMinX) - 100;
+    const contentMaxX = Math.max(maxX, trailMaxX) + 100;
+    const contentMinY = Math.min(minY, trailMinY) - 100;
+    const contentMaxY = Math.max(maxY, trailMaxY) + 100;
+    
+    const contentW = contentMaxX - contentMinX;
+    const contentH = contentMaxY - contentMinY;
+    
+    const scaleX = W / contentW;
+    const scaleY = H / contentH;
+    const targetZoom = Math.min(scaleX, scaleY, 1);
+    
+    zoomOutTarget = Math.max(0.1, targetZoom);
+    
+    const contentCenterX = (contentMinX + contentMaxX) / 2;
+    const contentCenterY = (contentMinY + contentMaxY) / 2;
+    slideStartX = offsetX;
+    slideStartY = offsetY;
+    slideTargetX = W/2-contentCenterX;
+    slideTargetY = H/2-contentCenterY;
+    slideProgress = 0;
+    sliding = true;
 }
 
 function update(dt) {
@@ -202,6 +251,7 @@ function update(dt) {
         const ease = t * (2 - t);
         offsetX = slideStartX + (slideTargetX - slideStartX) * ease;
         offsetY = slideStartY + (slideTargetY - slideStartY) * ease;
+        zoomOutFactor = zoomOutStart + (zoomOutTarget - zoomOutStart) * ease;
     }
     
     if (gameOver) {
@@ -252,7 +302,7 @@ function update(dt) {
     ship.trail.unshift({ x: ship.x, y: ship.y, time });
     
     if(grav.dist < body.radius) {
-        gameOver = true;
+        endGame();
     } else if (targetGrav.force > grav.force && !sliding) {
         transitionToNextLevel();
     } 
@@ -275,7 +325,7 @@ function update(dt) {
         if (e >= 1) {
             const screenPos = worldToScreen(ship.x, ship.y);
             if (screenPos.x < -100 || screenPos.x > W + 100 || screenPos.y < -100 || screenPos.y > H + 100) {
-                gameOver = true;
+                endGame();
             }
         }
     }
@@ -538,6 +588,9 @@ function resetGame() {
     initShip(planets.at(-2), planets.at(-1));
     level = 1;
     gameOver = false;
+    zoomOutFactor = 1;
+    zoomOutStart = 1;
+    zoomOutTarget = 1;
     levelDeltaVs = {};
     offsetX = 0;
     offsetY = 0;
@@ -556,11 +609,16 @@ function gameLoop(timestamp) {
     ctx.fillRect(0, 0, W, H);
     
     drawStars();
-    drawOrbitPath();
-    drawSOIs();
-    planets.slice(-3).forEach(p => p.draw(ctx, time));
+    if(gameOver){
+        planets.forEach(p => p.draw(ctx, time));
+        ship.draw(ctx, Infinity);
+    }else{
+        drawOrbitPath();
+        drawSOIs();
+        planets.slice(-3).forEach(p => p.draw(ctx, time));
+        ship.draw(ctx);
+    }
     drawExplosions();
-    ship.draw(ctx, time);
     drawPerigee();
     drawUI();
     
