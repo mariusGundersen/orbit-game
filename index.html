@@ -18,10 +18,16 @@
             display: block;
             width: 100%;
             height: 100%;
+            grid-area: bg;
+        }
+        body {
+            display: grid;
+            grid-template-areas: "bg";
         }
     </style>
 </head>
 <body>
+<canvas id="background"></canvas>
 <canvas id="game"></canvas>
 <script src="main.js" type="module"></script>
 </body>

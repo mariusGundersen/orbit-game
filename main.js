@@ -5,12 +5,18 @@ import Ship from './ship.js';
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 
+const bgCanvas = document.getElementById('background');
+const bgCtx = bgCanvas.getContext('2d');
+
 export let W, H;
 function resize() {
     W = window.innerWidth;
     canvas.width = W * devicePixelRatio;
     H = window.innerHeight;
     canvas.height = H * devicePixelRatio;
+    bgCanvas.width = W * devicePixelRatio;
+    bgCanvas.height = H * devicePixelRatio;
+    drawBackground();
 }
 resize();
 window.addEventListener('resize', resize);
@@ -22,9 +28,8 @@ const AUTO_CIRCULARIZE = false;
 
 /** @type {Planet[]} */
 let planets = [];
-let stars = [];
-function generateStars() {
-    stars = [];
+function drawBackground() {
+    const stars = [];
     for (let i = 0; i < 200; i++) {
         stars.push({
             x: Math.random() * W,
@@ -33,8 +38,19 @@ function generateStars() {
             alpha: Math.random() * 0.5 + 0.3
         });
     }
+    bgCtx.scale(devicePixelRatio, devicePixelRatio);
+    bgCtx.fillStyle = '#0a0a12';
+    bgCtx.fillRect(0, 0, W, H);
+    stars.forEach(s => {
+        bgCtx.globalAlpha = s.alpha;
+        bgCtx.fillStyle = '#ffffff';
+        bgCtx.beginPath();
+        bgCtx.arc(s.x, s.y, s.size, 0, Math.PI * 2);
+        bgCtx.fill();
+    });
+    bgCtx.globalAlpha = 1;
+    bgCtx.resetTransform();
 }
-generateStars();
 
 function initPlanets() {
     planets = [];
@@ -479,19 +495,6 @@ function drawPerigee() {
     ctx.globalAlpha = 1;
 }
 
-function drawStars() {
-    stars.forEach(s => {
-        ctx.globalAlpha = s.alpha;
-        ctx.fillStyle = '#ffffff';
-        const x = (s.x - offsetX * 0.1 + W * 2) % W;
-        const y = (s.y - offsetY * 0.1 + H * 2) % H;
-        ctx.beginPath();
-        ctx.arc(x, y, s.size, 0, Math.PI * 2);
-        ctx.fill();
-    });
-    ctx.globalAlpha = 1;
-}
-
 function drawUI() {    
     ctx.font = '14px "Courier New", monospace';
     ctx.fillStyle = '#00e5ff';
@@ -612,11 +615,9 @@ function gameLoop(timestamp) {
     dt = Math.min((timestamp - lastTime) / 1000, 0.05);
     lastTime = timestamp;
     
+    ctx.reset();
     ctx.scale(devicePixelRatio, devicePixelRatio);
-    ctx.fillStyle = '#0a0a12';
-    ctx.fillRect(0, 0, W, H);
     
-    drawStars();
     if(gameOver){
         transformScreen(() => {
         planets.forEach(p => p.draw(ctx, time));
