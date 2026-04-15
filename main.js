@@ -668,7 +668,9 @@ function gameLoop(timestamp) {
 function handleStart(e) {
     e.preventDefault();
     if (gameOver) {
-        resetGame();
+        if(!sliding){
+            resetGame();
+        }
         return;
     }
     
@@ -686,6 +688,9 @@ canvas.addEventListener('pointerleave', handleEnd);
 
 function handleKeyDown(e) {
     if (gameOver) {
+        if(!sliding){
+            resetGame();
+        }
         return;
     }
     
