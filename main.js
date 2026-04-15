@@ -8,6 +8,23 @@ const ctx = canvas.getContext('2d');
 const bgCanvas = document.getElementById('background');
 const bgCtx = bgCanvas.getContext('2d');
 
+let seed = hashCode(new Date().toDateString());
+function hashCode(str) {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+        hash = ((hash << 5) - hash) + str.charCodeAt(i);
+        hash |= 0;
+    }
+    return Math.abs(hash);
+}
+function rand() {
+    seed ^= seed << 13;
+    seed ^= seed >> 17;
+    seed ^= seed << 5;
+    return (seed >>> 0) / 0xffffffff;
+}
+
+export { rand };
 export let W, H;
 function resize() {
     W = window.innerWidth;
@@ -32,10 +49,10 @@ function drawBackground() {
     const stars = [];
     for (let i = 0; i < 200; i++) {
         stars.push({
-            x: Math.random() * W,
-            y: Math.random() * H,
-            size: Math.random() * 1.5 + 0.5,
-            alpha: Math.random() * 0.5 + 0.3
+            x: rand() * W,
+            y: rand() * H,
+            size: rand() * 1.5 + 0.5,
+            alpha: rand() * 0.5 + 0.3
         });
     }
     bgCtx.scale(devicePixelRatio, devicePixelRatio);
@@ -162,11 +179,11 @@ function generateRandomPlanet(refX, refY) {
 
     let x, y;
     if (W > H) {
-        x = refX + W * 0.25 + Math.random() * W * 0.35;
-        y = H * 0.2 + Math.random() * H * 0.6;
+        x = refX + W * 0.25 + rand() * W * 0.35;
+        y = H * 0.2 + rand() * H * 0.6;
     } else {
-        x = W * 0.2 + Math.random() * W * 0.6;
-        y = refY - H * 0.25 - Math.random() * H * 0.35;
+        x = W * 0.2 + rand() * W * 0.6;
+        y = refY - H * 0.25 - rand() * H * 0.35;
     }
     
     return new Planet(x, y);
@@ -594,6 +611,7 @@ function drawGameOver() {
 }
 
 function resetGame() {
+    seed = hashCode(new Date().toDateString());
     initPlanets();
     initShip(planets.at(-2), planets.at(-1));
     level = 1;

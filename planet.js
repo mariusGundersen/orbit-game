@@ -1,6 +1,6 @@
 // @ts-check
 
-import { G } from "./main.js";
+import { G, rand } from "./main.js";
 
 export default class Planet {
   static DENSITY = 80;
@@ -37,11 +37,11 @@ export default class Planet {
   }
 
   static randomColor() {
-    return Planet.COLORS[Math.floor(Math.random() * Planet.COLORS.length)];
+    return Planet.COLORS[Math.floor(rand() * Planet.COLORS.length)];
   }
 
   static randomMass() {
-    return (35 + Math.random() * 30) * Planet.DENSITY;
+    return (35 + rand() * 30) * Planet.DENSITY;
   }
 
     /**
