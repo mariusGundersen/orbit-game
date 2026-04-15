@@ -176,14 +176,16 @@ function drawExplosions() {
 }
 
 function generateRandomPlanet(refX, refY) {
-
+    const t = Math.min(1, Math.max(0, (level - 1) / 9));
+    const inline = (0.5 + (rand() - 0.5) * t);
+    const block = (0.5 + (rand() - 0.5) * t);
     let x, y;
     if (W > H) {
-        x = refX + W * 0.25 + rand() * W * 0.35;
-        y = H * 0.2 + rand() * H * 0.6;
+        x = refX + W * block;
+        y = H * inline;
     } else {
-        x = W * 0.2 + rand() * W * 0.6;
-        y = refY - H * 0.25 - rand() * H * 0.35;
+        x = W * inline;
+        y = refY - H * block;
     }
     
     return new Planet(x, y);
