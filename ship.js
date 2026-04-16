@@ -284,25 +284,36 @@ export default class Ship {
           ctx.lineWidth = 2;
           ctx.setLineDash([4, 4]);
           
-          const cx = body.x - a * eVecX;
-          const cy = body.y - a * eVecY;
           const angle = Math.atan2(eVecY, eVecX);
           
           ctx.beginPath();
           const semiMajor = Math.abs(a);
-          let move = true;
-          for (let i = -10; i <= 10; i++) {
-              const t = i * 0.2;
+
+          const r = semiMajor * (e * e - 1) / (1 + e);
+          const cx = r * Math.cos(angle);
+          const cy = r * Math.sin(angle);
+
+          ctx.moveTo(body.x + cx, body.y + cy);
+          for (let i = 1; i <= 20; i++) {
+              const t = i * 0.1;
               const r = semiMajor * (e * e - 1) / (1 + e * Math.cos(t));
-              const px = body.x + r * Math.cos(t + angle);
-              const py = body.y + r * Math.sin(t + angle);
-              if(px < -100 || px > W + 100 || py < -100 || py > H + 100) continue;
-              if (move) {
-                  ctx.moveTo(px, py);
-                  move = false;
-              } else {
-                  ctx.lineTo(px, py);
-              }
+              const px = r * Math.cos(t + angle);
+              const py = r * Math.sin(t + angle);
+
+              // Don't draw the line if floating point arithmetic fails
+              if(cx*px + cy*py < 0) break;
+              ctx.lineTo(body.x + px, body.y + py);
+          }
+          ctx.moveTo(body.x + cx, body.y + cy);
+          for (let i = -1; i >= -20; i--) {
+              const t = i * 0.1;
+              const r = semiMajor * (e * e - 1) / (1 + e * Math.cos(t));
+              const px = r * Math.cos(t + angle);
+              const py = r * Math.sin(t + angle);
+
+              // Don't draw the line if floating point arithmetic fails
+              if(cx*px + cy*py < 0) break;
+              ctx.lineTo(body.x + px, body.y + py);
           }
           ctx.stroke();
           ctx.setLineDash([]);
