@@ -282,7 +282,7 @@ export default class Ship {
       } else if (e >= 1) {
           ctx.strokeStyle = body.color + '80';
           ctx.lineWidth = 2;
-          ctx.setLineDash([4, 4]);
+          ctx.setLineDash([8, 8]);
           
           const angle = Math.atan2(eVecY, eVecX);
           
@@ -293,6 +293,11 @@ export default class Ship {
           const cx = r * Math.cos(angle);
           const cy = r * Math.sin(angle);
 
+          let ox = cx;
+          let oy = cy;
+          let nx = 0;
+          let ny = 0;
+
           ctx.moveTo(body.x + cx, body.y + cy);
           for (let i = 1; i <= 20; i++) {
               const t = i * 0.1;
@@ -301,9 +306,23 @@ export default class Ship {
               const py = r * Math.sin(t + angle);
 
               // Don't draw the line if floating point arithmetic fails
-              if(cx*px + cy*py < 0) break;
+              if(cx*px + cy*py < 0) {
+                ctx.lineTo(body.x + ox + nx*10, body.y + oy + ny*10);
+                break;
+              }
+              
               ctx.lineTo(body.x + px, body.y + py);
+              nx = px - ox;
+              ny = py - oy;
+              ox = px;
+              oy = py;
           }
+
+          ox = cx;
+          oy = cy;
+          nx = 0;
+          ny = 0;
+
           ctx.moveTo(body.x + cx, body.y + cy);
           for (let i = -1; i >= -20; i--) {
               const t = i * 0.1;
@@ -312,8 +331,14 @@ export default class Ship {
               const py = r * Math.sin(t + angle);
 
               // Don't draw the line if floating point arithmetic fails
-              if(cx*px + cy*py < 0) break;
+              if(cx*px + cy*py < 0) {
+                ctx.lineTo(body.x + ox + nx*10, body.y + oy + ny*10);
+                break;
+              }
               ctx.lineTo(body.x + px, body.y + py);
+              nx = px - ox;
+              ny = py - oy;
+              ox = px, oy = py;
           }
           ctx.stroke();
           ctx.setLineDash([]);
