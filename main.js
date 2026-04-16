@@ -178,7 +178,7 @@ function drawExplosions() {
 function generateRandomPlanet(refX, refY) {
     const t = Math.min(1, Math.max(0, (level - 1) / 9));
     const inline = (0.5 + (rand() - 0.5) * t);
-    const block = (0.5 + (rand() - 0.5) * t);
+    const block = (0.5 + (rand() - 0.5) * t * 0.5);
     let x, y;
     if (W > H) {
         x = refX + W * block;
