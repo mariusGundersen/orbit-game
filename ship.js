@@ -65,9 +65,8 @@ export default class Ship {
 
   /**
    * @param {CanvasRenderingContext2D} ctx
-   * @param {number} [maxTrailAge]
    */
-  draw(ctx, maxTrailAge) {
+  draw(ctx) {
     const angle = Math.atan2(this.vy, this.vx);
 
     ctx.save();
@@ -204,5 +203,120 @@ export default class Ship {
       edgeX - Math.cos(pointerAngle) * (20 + width / 2),
       edgeY - Math.sin(pointerAngle) * (20 + width / 2),
     );
+  }
+
+  /**
+   * @param {CanvasRenderingContext2D} ctx
+   */
+  drawSOIs(ctx) {      
+      const p1 = this.orbiting;
+      const p2 = this.target;
+      
+      const dx = p1.x - p2.x;
+      const dy = p1.y - p2.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      
+      const radius1 = (p1.mass / (p1.mass + p2.mass)) * dist;
+      const radius2 = (p2.mass / (p1.mass + p2.mass)) * dist;
+      const dir = Math.atan2(dy, dx);
+  
+      const arcSize = Math.PI/5;
+
+      ctx.save();
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = '#555';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(p2.x, p2.y, radius2, dir - arcSize, dir + arcSize);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(p1.x, p1.y, radius1, dir + Math.PI - arcSize, dir + Math.PI + arcSize);
+      ctx.stroke();
+      ctx.restore();
+  }
+
+  /**
+   * @param {CanvasRenderingContext2D} ctx
+   */
+  drawOrbitPath(ctx) {
+      const body = this.orbiting;
+      
+      const dx = this.x - body.x;
+      const dy = this.y - body.y;
+      const currentDist = Math.sqrt(dx * dx + dy * dy);
+      const vx = this.vx;
+      const vy = this.vy;
+      const speedSq = vx * vx + vy * vy;
+      
+      const rx = dx / currentDist;
+      const ry = dy / currentDist;
+      
+      const h = dx * vy - dy * vx;
+      const eVecX = (vy * h) / (G * body.mass) - rx;
+      const eVecY = (-vx * h) / (G * body.mass) - ry;
+      const e = Math.sqrt(eVecX * eVecX + eVecY * eVecY);
+      
+      const a = (G * body.mass) / (2 * (G * body.mass) / currentDist - speedSq);
+            
+      if (a > 0 && e < 1 && e > 0.01) {
+          /*if(perigeePos){
+              const perigeeDist = a * (1 - e);
+              
+              perigeePos.x = body.x + (perigeeDist * eVecX / e);
+              perigeePos.y = body.y + (perigeeDist * eVecY / e);
+          }*/
+  
+          const cx = body.x - a * eVecX;
+          const cy = body.y - a * eVecY;
+          const b = a * Math.sqrt(1 - e * e);
+          
+          const angle = Math.atan2(eVecY, eVecX);
+                    
+          ctx.strokeStyle = body.color + '80';
+          ctx.lineWidth = 2;
+          ctx.setLineDash([8, 8]);
+          ctx.beginPath();
+          ctx.ellipse(cx, cy, a, b, angle, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.setLineDash([]);
+      } else if (e >= 1) {
+          ctx.strokeStyle = body.color + '80';
+          ctx.lineWidth = 2;
+          ctx.setLineDash([4, 4]);
+          
+          const cx = body.x - a * eVecX;
+          const cy = body.y - a * eVecY;
+          const angle = Math.atan2(eVecY, eVecX);
+          
+          ctx.beginPath();
+          const semiMajor = Math.abs(a);
+          let move = true;
+          for (let i = -10; i <= 10; i++) {
+              const t = i * 0.2;
+              const r = semiMajor * (e * e - 1) / (1 + e * Math.cos(t));
+              const px = body.x + r * Math.cos(t + angle);
+              const py = body.y + r * Math.sin(t + angle);
+              if(px < -100 || px > W + 100 || py < -100 || py > H + 100) continue;
+              if (move) {
+                  ctx.moveTo(px, py);
+                  move = false;
+              } else {
+                  ctx.lineTo(px, py);
+              }
+          }
+          ctx.stroke();
+          ctx.setLineDash([]);
+          
+          //perigeePos = null;
+      } else {
+          ctx.strokeStyle = body.color + '80';
+          ctx.lineWidth = 2;
+          ctx.setLineDash([8, 8]);
+          ctx.beginPath();
+          ctx.arc(body.x, body.y, currentDist, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.setLineDash([]);
+          //perigeePos = null;
+      }
   }
 }

@@ -347,7 +347,7 @@ function update(dt) {
     
     if(grav.dist < body.radius) {
         endGame();
-    } else if (targetGrav.force > grav.force && !sliding) {
+    } else if (targetGrav.force > grav.force) {
         transitionToNextLevel();
     } 
     
@@ -372,124 +372,6 @@ function update(dt) {
                 endGame();
             }
         }
-    }
-}
-
-function drawSOIs() {
-    if (level > 4) return;
-    
-    const p1 = ship.orbiting;
-    const p2 = ship.target;
-    
-    const dx = p1.x - p2.x;
-    const dy = p1.y - p2.y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    
-    const pos1 = worldToScreen(p1.x, p1.y);
-    const pos2 = worldToScreen(p2.x, p2.y);
-    const radius1 = (p1.mass / (p1.mass + p2.mass)) * dist;
-    const radius2 = (p2.mass / (p1.mass + p2.mass)) * dist;
-    const dir = Math.atan2(dy, dx);
-
-    const arcSize = Math.PI/5;
-    
-    ctx.globalAlpha = 0.4;
-    ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.arc(pos2.x, pos2.y, radius2, dir - arcSize, dir + arcSize);
-    ctx.stroke();
-    ctx.restore();
-    ctx.beginPath();
-    ctx.arc(pos1.x, pos1.y, radius1, dir + Math.PI - arcSize, dir + Math.PI + arcSize);
-    ctx.stroke();
-    ctx.restore();
-}
-
-function drawOrbitPath() {
-    const body = ship.orbiting;
-    if (!body) return;
-    
-    const dx = ship.x - body.x;
-    const dy = ship.y - body.y;
-    const currentDist = Math.sqrt(dx * dx + dy * dy);
-    const vx = ship.vx;
-    const vy = ship.vy;
-    const speedSq = vx * vx + vy * vy;
-    
-    const rx = dx / currentDist;
-    const ry = dy / currentDist;
-    
-    const h = dx * vy - dy * vx;
-    const eVecX = (vy * h) / (G * body.mass) - rx;
-    const eVecY = (-vx * h) / (G * body.mass) - ry;
-    const e = Math.sqrt(eVecX * eVecX + eVecY * eVecY);
-    
-    const a = (G * body.mass) / (2 * (G * body.mass) / currentDist - speedSq);
-    
-    const bodyPos = worldToScreen(body.x, body.y);
-    
-    if (a > 0 && e < 1 && e > 0.01) {
-        if(perigeePos){
-            const perigeeDist = a * (1 - e);
-            
-            perigeePos.x = body.x + (perigeeDist * eVecX / e);
-            perigeePos.y = body.y + (perigeeDist * eVecY / e);
-        }
-
-        const cx = body.x - a * eVecX;
-        const cy = body.y - a * eVecY;
-        const b = a * Math.sqrt(1 - e * e);
-        
-        const angle = Math.atan2(eVecY, eVecX);
-        
-        const centerPos = worldToScreen(cx, cy);
-        
-        ctx.strokeStyle = body.color + '80';
-        ctx.lineWidth = 2;
-        ctx.setLineDash([8, 8]);
-        ctx.beginPath();
-        ctx.ellipse(centerPos.x, centerPos.y, a, b, angle, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.setLineDash([]);
-    } else if (e >= 1) {
-        ctx.strokeStyle = body.color + '80';
-        ctx.lineWidth = 2;
-        ctx.setLineDash([4, 4]);
-        
-        const cx = body.x - a * eVecX;
-        const cy = body.y - a * eVecY;
-        const angle = Math.atan2(eVecY, eVecX);
-        
-        ctx.beginPath();
-        const semiMajor = Math.abs(a);
-        let move = true;
-        for (let i = -10; i <= 10; i++) {
-            const t = i * 0.2;
-            const r = semiMajor * (e * e - 1) / (1 + e * Math.cos(t));
-            const px = bodyPos.x + r * Math.cos(t + angle);
-            const py = bodyPos.y + r * Math.sin(t + angle);
-            if(px < -100 || px > W + 100 || py < -100 || py > H + 100) continue;
-            if (move) {
-                ctx.moveTo(px, py);
-                move = false;
-            } else {
-                ctx.lineTo(px, py);
-            }
-        }
-        ctx.stroke();
-        ctx.setLineDash([]);
-        
-        perigeePos = null;
-    } else {
-        ctx.strokeStyle = body.color + '80';
-        ctx.lineWidth = 2;
-        ctx.setLineDash([8, 8]);
-        ctx.beginPath();
-        ctx.arc(bodyPos.x, bodyPos.y, currentDist, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.setLineDash([]);
-        perigeePos = null;
     }
 }
 
@@ -665,17 +547,19 @@ function gameLoop(timestamp) {
     
     if(gameOver){
         transformScreen(() => {
-        planets.forEach(p => p.draw(ctx, time));
+            planets.forEach(p => p.draw(ctx, time));
             ship.draw(ctx);
             ship.drawTrail(ctx, Infinity);
         });
     }else{
-        drawOrbitPath();
-        drawSOIs();
         transformScreen(() => {
+            ship.drawOrbitPath(ctx);
+            if(level < 4){
+                ship.drawSOIs(ctx);
+            }
             planets.slice(-3).forEach(p => p.draw(ctx, time));
-            ship.draw(ctx);
             ship.drawTrail(ctx);
+            ship.draw(ctx);
             drawExplosions();
             drawPerigee();
         });
