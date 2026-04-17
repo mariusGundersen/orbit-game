@@ -8,6 +8,18 @@ const MAX_TRAIL_AGE = 1000;
 const TRAIL_PERIODICITY = 3;
 
 export default class Ship {
+  x = 0;
+  y = 0;
+  vx = 0;
+  vy = 0;
+  orbiting;
+  target;
+  /** @type {{x: number, y: number, time: number}[]} */
+  trail = [];
+  /** @type {-1 | 0 | 1} */
+  thrustDir = 0;
+  fuel = 1000;
+
   /**
    * @param {Planet} orbiting
    * @param {Planet} target
@@ -19,17 +31,6 @@ export default class Ship {
     this.y = this.orbiting.y;
     this.vy = -Math.sqrt(this.orbiting.massG / (this.orbiting.radius * 2));
   }
-  x = 0;
-  y = 0;
-  vx = 0;
-  vy = 0;
-  orbiting;
-  target;
-  /** @type {{x: number, y: number, time: number}[]} */
-  trail = [];
-  /** @type {-1 | 0 | 1} */
-  thrustDir = 0;
-  consumedDeltaV = 0;
 
   get distanceToPlanet() {
     return Math.sqrt(
@@ -42,22 +43,23 @@ export default class Ship {
    * @param {-1 | 0 | 1} dir
    */
   setThrust(dir) {
+    if(this.fuel <= 0) return;
     this.thrustDir = dir;
   }
 
   /**
    * @param {number} dt
-   * @param {number} [dir]
+   * @param {-1 | 0 | 1} [dir]
    */
   thrust(dt, dir = this.thrustDir) {
-    if (dir === 0) return false;
+    if (dir === 0 || this.fuel <= 0) return false;
 
     const speed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
     if (speed > 0) {
-      const dv = THRUST_POWER * dt * dir;
+      const dv = Math.min(this.fuel, THRUST_POWER * dt) * dir;
       this.vx += (this.vx / speed) * dv;
       this.vy += (this.vy / speed) * dv;
-      this.consumedDeltaV += Math.abs(dv);
+      this.fuel -= Math.abs(dv);
     }
 
     return true;

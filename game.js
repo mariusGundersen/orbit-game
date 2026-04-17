@@ -155,7 +155,11 @@ export default class Game {
       return;
     }
 
-    const body = this.ship.orbiting;
+    if(this.ship.fuel <= 0) {
+        this.endGame();
+        return;
+    }
+
 
     /*
       if (perigeePos) {
@@ -186,7 +190,7 @@ export default class Game {
     const grav = this.ship.orbiting.calculateForceOnObject(this.ship);
     const targetGrav = this.ship.target.calculateForceOnObject(this.ship);
 
-    if (grav.dist < body.radius) {
+    if (grav.dist < this.ship.orbiting.radius) {
       this.endGame();
       return;
     } else if (targetGrav.force > grav.force) {

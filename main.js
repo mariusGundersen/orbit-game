@@ -48,25 +48,6 @@ function drawBackground() {
     bgCtx.resetTransform();
 }
 
-let levelDeltaVs = {};
-let highScores = [];
-
-function loadHighScores() {
-    const stored = localStorage.getItem('orbitHighScores');
-    if (stored) {
-        highScores = JSON.parse(stored);
-    }
-}
-
-function saveHighScore(lvl, dv) {
-    if (!highScores[lvl] || dv < highScores[lvl]) {
-        highScores[lvl] = dv;
-        localStorage.setItem('orbitHighScores', JSON.stringify(highScores));
-    }
-}
-
-loadHighScores();
-
 export function worldToScreen(x, y) {
     const cx = W / 2;
     const cy = H / 2;
@@ -99,7 +80,7 @@ function drawUI(avgFps) {
     });
     ctx.stroke();
     ctx.textAlign = 'right';
-    ctx.fillText(`DV: ${Math.round(game.ship.consumedDeltaV)}`, W - 20, 30);
+    ctx.fillText(`DV: ${Math.round(game.ship.fuel)}`, W - 20, 30);
     ctx.fillText(`LEVEL ${game.level}`, W - 20, 50);
     ctx.textAlign = 'left';
     
@@ -138,41 +119,7 @@ function drawGameOver() {
     ctx.font = '16px "Courier New", monospace';
     ctx.fillStyle = '#ffffff';
     ctx.fillText(`Highest Level: ${game.level}`, W / 2, 90);
-    
-    const tableStartY = 130;
-    const col1X = W / 2 - 80;
-    const col2X = W / 2 + 40;
-    const col3X = W / 2 + 100;
-    
-    ctx.font = 'bold 14px "Courier New", monospace';
-    ctx.fillStyle = '#00e5ff';
-    ctx.fillText('LEVEL', col1X, tableStartY);
-    ctx.fillText('BEST', col2X, tableStartY);
-    ctx.fillText('RUN', col3X, tableStartY);
-    
-    ctx.strokeStyle = '#00e5ff';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(W / 2 - 120, tableStartY + 10);
-    ctx.lineTo(W / 2 + 120, tableStartY + 10);
-    ctx.stroke();
-    
-    ctx.font = '14px "Courier New", monospace';
-    const maxLevels = Math.max(game.level, highScores.length);
-    let y = tableStartY + 25;
-    for (let i = maxLevels; i > 1; i--) {
-        const best = highScores[i] || 0;
-        const run = levelDeltaVs[i] || 0;
-        const isCurrent = i === game.level;
-        ctx.fillStyle = isCurrent ? '#ff6b35' : '#aaaaaa';
-        ctx.fillText(i.toString(), col1X, y);
-        ctx.fillStyle = isCurrent ? '#00ff88' : '#666666';
-        ctx.fillText(Math.round(best).toString(), col2X, y);
-        ctx.fillStyle = isCurrent ? '#ff6b35' : '#aaaaaa';
-        ctx.fillText(run > 0 ? Math.round(run).toString() : '-', col3X, y);
-        y += 20;
-    }
-    
+        
     ctx.font = '14px "Courier New", monospace';
     ctx.fillStyle = '#666666';
     ctx.fillText('Click to restart', W / 2, H - 30);
@@ -180,7 +127,6 @@ function drawGameOver() {
 
 function resetGame() {
     game = new Game(game.viewport);
-    levelDeltaVs = {};
 }
 
 let lastTime = 0;
