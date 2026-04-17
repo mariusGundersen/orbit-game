@@ -1,6 +1,7 @@
 // @ts-check
 
-import { G, rand } from "./main.js";
+import { G } from "./main.js";
+import { rand } from "./random.js";
 
 export default class Planet {
   static DENSITY = 80;

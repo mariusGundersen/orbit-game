@@ -1,6 +1,7 @@
 import Explosion from './explosion.js';
 import Planet from './planet.js';
 import Ship from './ship.js';
+import {rand, reset} from './random.js';
 
 
 const canvas = document.getElementById('game');
@@ -9,28 +10,11 @@ const ctx = canvas.getContext('2d');
 const bgCanvas = document.getElementById('background');
 const bgCtx = bgCanvas.getContext('2d');
 
-let seed = hashCode(new Date().toDateString());
-function hashCode(str) {
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-        hash = ((hash << 5) - hash) + str.charCodeAt(i);
-        hash |= 0;
-    }
-    return Math.abs(hash);
-}
-function rand() {
-    seed ^= seed << 13;
-    seed ^= seed >> 17;
-    seed ^= seed << 5;
-    return (seed >>> 0) / 0xffffffff;
-}
-
-export { rand };
 export let W, H;
 function resize() {
     W = window.innerWidth;
-    canvas.width = W * devicePixelRatio;
     H = window.innerHeight;
+    canvas.width = W * devicePixelRatio;
     canvas.height = H * devicePixelRatio;
     bgCanvas.width = W * devicePixelRatio;
     bgCanvas.height = H * devicePixelRatio;
@@ -478,7 +462,7 @@ function drawGameOver() {
 }
 
 function resetGame() {
-    seed = hashCode(new Date().toDateString());
+    reset(new Date().toDateString());
     initPlanets();
     initShip(planets.at(-2), planets.at(-1));
     level = 1;
