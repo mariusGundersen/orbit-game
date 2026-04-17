@@ -64,6 +64,20 @@ export default class Ship {
   }
 
   /**
+   * @param {number} dt
+   * @param {{ax: number, ay: number}} acceleration
+   */
+  update(dt, {ax, ay}){
+    this.vx += ax * dt;
+    this.vy += ay * dt;
+    
+    this.x += this.vx * dt;
+    this.y += this.vy * dt;
+
+    this.trail.unshift({ x: this.x, y: this.y, time: 0 });
+  }
+
+  /**
    * @param {CanvasRenderingContext2D} ctx
    */
   draw(ctx) {

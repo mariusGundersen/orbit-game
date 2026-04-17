@@ -1,9 +1,6 @@
-import Explosion from './explosion.js';
-import Planet from './planet.js';
-import Ship from './ship.js';
-import {rand, reset} from './random.js';
-import Viewport from './viewport.js';
+import Game from './game.js';
 
+export const G = 800;
 
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
@@ -11,7 +8,6 @@ const ctx = canvas.getContext('2d');
 const bgCanvas = document.getElementById('background');
 const bgCtx = bgCanvas.getContext('2d');
 
-const viewport = new Viewport();
 
 export let W, H;
 function resize() {
@@ -24,23 +20,21 @@ function resize() {
     drawBackground();
 }
 resize();
+
 window.addEventListener('resize', resize);
 
-export const G = 800;
+let game = new Game();
 
 const AUTO_CIRCULARIZE = false;
 
-
-/** @type {Planet[]} */
-let planets = [];
 function drawBackground() {
     const stars = [];
     for (let i = 0; i < 200; i++) {
         stars.push({
-            x: rand() * W,
-            y: rand() * H,
-            size: rand() * 1.5 + 0.5,
-            alpha: rand() * 0.5 + 0.3
+            x: Math.random() * W,
+            y: Math.random() * H,
+            size: Math.random() * 1.5 + 0.5,
+            alpha: Math.random() * 0.5 + 0.3
         });
     }
     bgCtx.scale(devicePixelRatio, devicePixelRatio);
@@ -57,28 +51,6 @@ function drawBackground() {
     bgCtx.resetTransform();
 }
 
-function initPlanets() {
-    planets = [];
-    
-    const startX = W > H ? W * 0.25 : W * 0.5;
-    const startY = W > H ? H * 0.5 : H * 0.75;
-    planets.push(new Planet(startX, startY, 5000, '#00e5ff'));
-    
-    const targetX = W > H ? W * 0.75 : W * 0.5;
-    const targetY = W > H ? H * 0.5 : H * 0.25;
-    planets.push(new Planet(targetX, targetY, 4500, '#ff6b35'));
-}
-initPlanets();
-
-let ship = new Ship(planets.at(-2), planets.at(-1));
-
-function initShip(orbiting, target) {
-    ship = new Ship(orbiting, target);
-}
-
-let level = 1;
-let time = 0;
-let gameOver = false;
 let levelDeltaVs = {};
 let highScores = [];
 
@@ -97,221 +69,16 @@ function saveHighScore(lvl, dv) {
 }
 
 loadHighScores();
-let perigeePos = null;
-/**
- * @type {Explosion[]}
- */
-let explosions = [];
-
-function updateExplosions(dt) {
-    for(const explosion of explosions){
-        explosion.update(dt);
-    }
-}
-
-function drawExplosions() {
-    for (const explosion of explosions) {
-        explosion.draw(ctx);
-    }
-    ctx.globalAlpha = 1;
-}
-
-function generateRandomPlanet(refX, refY) {
-    const t = Math.min(1, Math.max(0, (level - 1) / 9));
-    const inline = (0.5 + (rand() - 0.5) * t);
-    const block = (0.5 + (rand() - 0.5) * t * 0.5);
-    let x, y;
-    if (W > H) {
-        x = refX + W * block;
-        y = H * inline;
-    } else {
-        x = W * inline;
-        y = refY - H * block;
-    }
-    
-    return new Planet(x, y);
-}
-
-function transitionToNextLevel() {
-    const oldOrbit = ship.orbiting;
-    const newOrbit = ship.target;
-    
-    const slideOffsetX = oldOrbit.x - newOrbit.x;
-    const slideOffsetY = oldOrbit.y - newOrbit.y;
-
-    viewport.slideBy(slideOffsetX, slideOffsetY);
-    
-    explosions.push(new Explosion(oldOrbit.x, oldOrbit.y, oldOrbit.color, oldOrbit.radius));
-    
-    const newPlanet = generateRandomPlanet(newOrbit.x, newOrbit.y);
-    planets.push(newPlanet);
-    ship.target = newPlanet;
-    ship.orbiting = newOrbit;
-    
-    levelDeltaVs[level] = ship.consumedDeltaV;
-    saveHighScore(level, ship.consumedDeltaV);
-    level++;
-
-    perigeePos = AUTO_CIRCULARIZE ? {
-        x: ship.orbiting.x,
-        y: ship.orbiting.y,
-    } : null;
-}
-
-export function transformScreen(cb){
-    ctx.save();
-    ctx.translate(W/2, H/2);
-    ctx.scale(viewport.zoom, viewport.zoom);
-    ctx.translate(viewport.x - W / 2, viewport.y - H / 2);
-    cb();
-    ctx.restore();
-}
 
 export function worldToScreen(x, y) {
     const cx = W / 2;
     const cy = H / 2;
     return { 
-        x: cx + (x + viewport.x - cx) * viewport.zoom, 
-        y: cy + (y + viewport.y - cy) * viewport.zoom 
+        x: cx + (x + game.viewport.x - cx) * game.viewport.zoom, 
+        y: cy + (y + game.viewport.y - cy) * game.viewport.zoom 
     };
 }
 
-function endGame(){
-    gameOver = true;
-
-    const orbitedPlanets = planets.slice(0, -1);
-    
-    const minX = Math.min(...orbitedPlanets.map(p => p.x));
-    const maxX = Math.max(...orbitedPlanets.map(p => p.x));
-    const minY = Math.min(...orbitedPlanets.map(p => p.y));
-    const maxY = Math.max(...orbitedPlanets.map(p => p.y));
-    
-    const trailX = ship.trail.map(t => t.x);
-    const trailY = ship.trail.map(t => t.y);
-    const trailMinX = trailX.length ? Math.min(...trailX) : 0;
-    const trailMaxX = trailX.length ? Math.max(...trailX) : 0;
-    const trailMinY = trailY.length ? Math.min(...trailY) : 0;
-    const trailMaxY = trailY.length ? Math.max(...trailY) : 0;
-    
-    const contentMinX = Math.min(minX, trailMinX) - 100;
-    const contentMaxX = Math.max(maxX, trailMaxX) + 100;
-    const contentMinY = Math.min(minY, trailMinY) - 100;
-    const contentMaxY = Math.max(maxY, trailMaxY) + 100;
-    
-    const contentW = contentMaxX - contentMinX;
-    const contentH = contentMaxY - contentMinY;
-    
-    const scaleX = W / contentW;
-    const scaleY = H / contentH;
-    const targetZoom = Math.min(scaleX, scaleY, 1);
-        
-    const contentCenterX = (contentMinX + contentMaxX) / 2;
-    const contentCenterY = (contentMinY + contentMaxY) / 2;
-
-    viewport.slideTo(W/2 - contentCenterX, H/2 - contentCenterY, targetZoom);
-}
-
-function update(dt) {
-    updateExplosions(dt);
-    viewport.update(dt);
-        
-    if (gameOver) {
-        return;
-    }
-    
-    time += dt;
-    
-    if(ship.thrust(dt)){
-        perigeePos = null;
-        return;
-    }
-    
-    const body = ship.orbiting;
-
-    if (perigeePos) {
-        const distToPerigee = Math.sqrt(
-            Math.pow(ship.x - perigeePos.x, 2) + 
-            Math.pow(ship.y - perigeePos.y, 2)
-        );
-        if (distToPerigee < 15) {
-            const orbitDist = Math.sqrt(
-                Math.pow(ship.x - body.x, 2) + 
-                Math.pow(ship.y - body.y, 2)
-            );
-            const circularSpeed = Math.sqrt(G * body.mass / orbitDist);
-            const currentSpeed = Math.sqrt(ship.vx * ship.vx + ship.vy * ship.vy);
-            if (currentSpeed > circularSpeed) {
-                ship.thrust(dt, 1);
-                return;
-            } else {
-                const scale = circularSpeed / currentSpeed;
-                ship.vx *= scale;
-                ship.vy *= scale;
-                perigeePos = null;
-            }
-        }
-    }
-    
-    const grav = ship.orbiting.calculateForceOnObject(ship);
-    const targetGrav = ship.target.calculateForceOnObject(ship);
-    ship.vx += grav.ax * dt;
-    ship.vy += grav.ay * dt;
-    
-    ship.x += ship.vx * dt;
-    ship.y += ship.vy * dt;
-    
-    ship.trail.unshift({ x: ship.x, y: ship.y, time });
-    
-    if(grav.dist < body.radius) {
-        endGame();
-    } else if (targetGrav.force > grav.force) {
-        transitionToNextLevel();
-    } 
-    
-    if (!gameOver && !viewport.sliding) {
-        const body = ship.orbiting;
-        const dx = ship.x - body.x;
-        const dy = ship.y - body.y;
-        const currentDist = Math.sqrt(dx * dx + dy * dy);
-        const speedSq = ship.vx * ship.vx + ship.vy * ship.vy;
-        
-        const rx = dx / currentDist;
-        const ry = dy / currentDist;
-        
-        const h = dx * ship.vy - dy * ship.vx;
-        const eVecX = (ship.vy * h) / (G * body.mass) - rx;
-        const eVecY = (-ship.vx * h) / (G * body.mass) - ry;
-        const e = Math.sqrt(eVecX * eVecX + eVecY * eVecY);
-        
-        if (e >= 1) {
-            const screenPos = worldToScreen(ship.x, ship.y);
-            if (screenPos.x < -100 || screenPos.x > W + 100 || screenPos.y < -100 || screenPos.y > H + 100) {
-                endGame();
-            }
-        }
-    }
-}
-
-function drawPerigee() {
-    if (!perigeePos) return;
-    
-    const pulse = Math.sin(time * 5) * 0.3 + 0.7;
-    
-    ctx.fillStyle = '#ffff00';
-    ctx.globalAlpha = pulse;
-    ctx.beginPath();
-    ctx.arc(perigeePos.x, perigeePos.y, 6, 0, Math.PI * 2);
-    ctx.fill();
-    
-    ctx.strokeStyle = '#ffff00';
-    ctx.lineWidth = 2;
-    ctx.globalAlpha = pulse * 0.5;
-    ctx.beginPath();
-    ctx.arc(perigeePos.x, perigeePos.y, 12, 0, Math.PI * 2);
-    ctx.stroke();
-    
-    ctx.globalAlpha = 1;
-}
 
 function drawUI(avgFps) {    
     ctx.font = '14px "Courier New", monospace';
@@ -335,24 +102,23 @@ function drawUI(avgFps) {
     });
     ctx.stroke();
     ctx.textAlign = 'right';
-    ctx.fillText(`DV: ${Math.round(ship.consumedDeltaV)}`, W - 20, 30);
-    ctx.fillText(`LEVEL ${level}`, W - 20, 50);
+    ctx.fillText(`DV: ${Math.round(game.ship.consumedDeltaV)}`, W - 20, 30);
+    ctx.fillText(`LEVEL ${game.level}`, W - 20, 50);
     ctx.textAlign = 'left';
     
-    if (!gameOver) {
-        ctx.font = '12px "Courier New", monospace';
-        ctx.fillStyle = '#ff6600';
-        ctx.globalAlpha = 0.5;
-        ctx.textAlign = 'left';
-        ctx.fillText('◄ RETRO', 20, H - 40);
-        
-        ctx.fillStyle = '#00ff88';
-        ctx.textAlign = 'right';
-        ctx.fillText('PROGRADE ►', W - 20, H - 40);
-        ctx.globalAlpha = 1;
-    }
+    ctx.font = '12px "Courier New", monospace';
+    ctx.fillStyle = '#ff6600';
+    ctx.globalAlpha = 0.5;
+    ctx.textAlign = 'left';
+    ctx.fillText('◄ RETRO', 20, H - 40);
     
-    if (level === 1 && !gameOver) {
+    ctx.fillStyle = '#00ff88';
+    ctx.textAlign = 'right';
+    ctx.fillText('PROGRADE ►', W - 20, H - 40);
+    ctx.globalAlpha = 1;
+    
+    
+    if (game.level === 1 ) {
         ctx.font = '12px "Courier New", monospace';
         ctx.fillStyle = '#aaaaaa';
         ctx.globalAlpha = 0.7;
@@ -361,20 +127,6 @@ function drawUI(avgFps) {
         ctx.fillText('TAP RIGHT TO BURN PROGRADE', W / 2, H - 70);
         ctx.globalAlpha = 1;
     }
-}
-
-function drawWinMessage() {
-    ctx.fillStyle = '#ff6b35';
-    ctx.font = 'bold 36px "Courier New", monospace';
-    ctx.textAlign = 'center';
-    ctx.shadowColor = '#ff6b35';
-    ctx.shadowBlur = 20;
-    ctx.fillText('ORBIT ESTABLISHED!', W / 2, H / 2 - 20);
-    ctx.shadowBlur = 0;
-    
-    ctx.font = '18px "Courier New", monospace';
-    ctx.fillStyle = '#ffffff';
-    ctx.fillText(`Level ${level}`, W / 2, H / 2 + 25);
 }
 
 function drawGameOver() {
@@ -388,7 +140,7 @@ function drawGameOver() {
     
     ctx.font = '16px "Courier New", monospace';
     ctx.fillStyle = '#ffffff';
-    ctx.fillText(`Highest Level: ${level}`, W / 2, 90);
+    ctx.fillText(`Highest Level: ${game.level}`, W / 2, 90);
     
     const tableStartY = 130;
     const col1X = W / 2 - 80;
@@ -409,12 +161,12 @@ function drawGameOver() {
     ctx.stroke();
     
     ctx.font = '14px "Courier New", monospace';
-    const maxLevels = Math.max(level, highScores.length);
+    const maxLevels = Math.max(game.level, highScores.length);
     let y = tableStartY + 25;
     for (let i = maxLevels; i > 1; i--) {
         const best = highScores[i] || 0;
         const run = levelDeltaVs[i] || 0;
-        const isCurrent = i === level;
+        const isCurrent = i === game.level;
         ctx.fillStyle = isCurrent ? '#ff6b35' : '#aaaaaa';
         ctx.fillText(i.toString(), col1X, y);
         ctx.fillStyle = isCurrent ? '#00ff88' : '#666666';
@@ -430,15 +182,8 @@ function drawGameOver() {
 }
 
 function resetGame() {
-    reset(new Date().toDateString());
-    viewport.reset();
-    initPlanets();
-    initShip(planets.at(-2), planets.at(-1));
-    level = 1;
-    gameOver = false;
+    game = new Game(game.viewport);
     levelDeltaVs = {};
-    perigeePos = null;
-    explosions = [];
 }
 
 let lastTime = 0;
@@ -454,55 +199,38 @@ function gameLoop(timestamp) {
     }
     const avgFps = fpsHistory.reduce((a, b) => a + b, 0) / fpsHistory.length;
     
+    game.update(dt);
+
     ctx.reset();
     ctx.scale(devicePixelRatio, devicePixelRatio);
     
-    if(gameOver){
-        transformScreen(() => {
-            planets.forEach(p => p.draw(ctx, time));
-            ship.draw(ctx);
-            ship.drawTrail(ctx, Infinity);
-        });
-    }else{
-        transformScreen(() => {
-            ship.drawOrbitPath(ctx);
-            if(level < 4){
-                ship.drawSOIs(ctx);
-            }
-            planets.slice(-3).forEach(p => p.draw(ctx, time));
-            ship.drawTrail(ctx);
-            ship.draw(ctx);
-            drawExplosions();
-            drawPerigee();
-        });
-        ship.drawPointer(ctx);
-    }
-    drawUI(avgFps);
-    
-    if (gameOver) {
+    game.draw(ctx);
+    if(game.gameOver){
         drawGameOver();
+    }else{
+        drawUI(avgFps);
     }
+    
     
     ctx.resetTransform();
-    update(dt);
     requestAnimationFrame(gameLoop);
 }
 
 function handleStart(e) {
     e.preventDefault();
-    if (gameOver) {
-        if(!viewport.sliding){
+    if (game.gameOver) {
+        if(!game.viewport.sliding){
             resetGame();
         }
         return;
     }
     
-    ship.setThrust(e.clientX < W / 2 ? -1 : 1);
+    game.ship.setThrust(e.clientX < W / 2 ? -1 : 1);
 }
 
 function handleEnd(e) {
     e.preventDefault();
-    ship.setThrust(0);
+    game.ship.setThrust(0);
 }
 
 canvas.addEventListener('pointerdown', handleStart);
@@ -510,24 +238,24 @@ canvas.addEventListener('pointerup', handleEnd);
 canvas.addEventListener('pointerleave', handleEnd);
 
 function handleKeyDown(e) {
-    if (gameOver) {
-        if(!viewport.sliding){
+    if (game.gameOver) {
+        if(!game.viewport.sliding){
             resetGame();
         }
         return;
     }
     
     if (e.code === 'ArrowLeft' || e.code === 'KeyA' || e.code === 'KeyQ') {
-        ship.setThrust(-1);
+        game.ship.setThrust(-1);
     } else if (e.code === 'ArrowRight' || e.code === 'KeyD' || e.code === 'KeyW') {
-        ship.setThrust(1);
+        game.ship.setThrust(1);
     }
 }
 
 function handleKeyUp(e) {
     if (e.code === 'ArrowLeft' || e.code === 'KeyA' || e.code === 'KeyQ' || 
         e.code === 'ArrowRight' || e.code === 'KeyD' || e.code === 'KeyW') {
-        ship.setThrust(0);
+        game.ship.setThrust(0);
     }
 }
 

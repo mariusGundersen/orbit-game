@@ -39,9 +39,15 @@ export default class Viewport {
     this.prevY = this.y;
     this.targetX = x;
     this.targetY = y;
-    this.progress = 0;
     this.prevZoom = this.zoom;
     this.targetZoom = Math.max(0.01, zoom);
+    if (
+      this.targetX !== this.prevX ||
+      this.targetY !== this.prevY ||
+      this.targetZoom !== this.prevZoom
+    ) {
+      this.progress = 0;
+    }
   }
 
   /**
@@ -49,7 +55,7 @@ export default class Viewport {
    * @param {number} y
    */
   slideBy(x, y) {
-    this.slideTo(this.x + x, this.y + y);
+    this.slideTo(this.targetX + x, this.targetY + y);
   }
 
   /**
@@ -63,11 +69,8 @@ export default class Viewport {
     }
     const t = this.progress;
     const ease = t * (2 - t);
-    this.x =
-      this.prevX + (this.targetX - this.prevX) * ease;
-    this.y =
-      this.prevY + (this.targetY - this.prevY) * ease;
-    this.zoom =
-      this.prevZoom + (this.targetZoom - this.prevZoom) * ease;
+    this.x = this.prevX + (this.targetX - this.prevX) * ease;
+    this.y = this.prevY + (this.targetY - this.prevY) * ease;
+    this.zoom = this.prevZoom + (this.targetZoom - this.prevZoom) * ease;
   }
 }
