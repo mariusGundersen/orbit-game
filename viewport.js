@@ -1,5 +1,7 @@
 // @ts-check
 
+import { H, W } from './main.js';
+
 export default class Viewport {
   x = 0;
   y = 0;
@@ -11,9 +13,22 @@ export default class Viewport {
   zoom = 1;
   targetZoom = 1;
   prevZoom = 1;
+  screenWidth = 100;
+  screenHeight = 100;
+  screenScale = 1;
 
   get sliding() {
     return this.progress < 1;
+  }
+
+  /**
+   * @param {number} w
+   * @param {number} h
+   */
+  setScreenSize(w, h) {
+    this.screenWidth = w;
+    this.screenHeight = h;
+    this.screenScale = w/h < W/H ? w/W : h/H;
   }
 
   reset() {

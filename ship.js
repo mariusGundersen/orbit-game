@@ -27,9 +27,9 @@ export default class Ship {
   constructor(orbiting, target) {
     this.target = target;
     this.orbiting = orbiting;
-    this.x = this.orbiting.x + this.orbiting.radius * 2;
-    this.y = this.orbiting.y;
-    this.vy = -Math.sqrt(this.orbiting.massG / (this.orbiting.radius * 2));
+    this.x = this.orbiting.x;
+    this.y = this.orbiting.y + this.orbiting.radius * 2;
+    this.vx = Math.sqrt(this.orbiting.massG / (this.orbiting.radius * 2));
   }
 
   get distanceToPlanet() {

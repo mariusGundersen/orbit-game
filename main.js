@@ -8,35 +8,38 @@ const bgCanvas = document.getElementById('background');
 const bgCtx = bgCanvas.getContext('2d');
 
 
-export let W, H;
+export let W = 420, H = 600;
+
+let game = new Game();
+
 function resize() {
-    W = window.innerWidth;
-    H = window.innerHeight;
-    canvas.width = W * devicePixelRatio;
-    canvas.height = H * devicePixelRatio;
-    bgCanvas.width = W * devicePixelRatio;
-    bgCanvas.height = H * devicePixelRatio;
-    drawBackground();
+    const width = window.innerWidth * devicePixelRatio;
+    const height = window.innerHeight * devicePixelRatio;
+    canvas.width = width;
+    canvas.height = height;
+    bgCanvas.width = width;
+    bgCanvas.height = height;
+    game.viewport.setScreenSize(width, height);
+    drawBackground(width, height);
 }
 resize();
 
 window.addEventListener('resize', resize);
 
-let game = new Game();
 
-function drawBackground() {
+function drawBackground(width, height) {
     const stars = [];
     for (let i = 0; i < 200; i++) {
         stars.push({
-            x: Math.random() * W,
-            y: Math.random() * H,
+            x: Math.random() * width,
+            y: Math.random() * height,
             size: Math.random() * 1.5 + 0.5,
             alpha: Math.random() * 0.5 + 0.3
         });
     }
     bgCtx.scale(devicePixelRatio, devicePixelRatio);
     bgCtx.fillStyle = '#0a0a12';
-    bgCtx.fillRect(0, 0, W, H);
+    bgCtx.fillRect(0, 0, width, height);
     stars.forEach(s => {
         bgCtx.globalAlpha = s.alpha;
         bgCtx.fillStyle = '#ffffff';
@@ -145,7 +148,9 @@ function gameLoop(timestamp) {
     game.update(dt);
 
     ctx.reset();
-    ctx.scale(devicePixelRatio, devicePixelRatio);
+    ctx.translate(game.viewport.screenWidth/2, game.viewport.screenHeight/2);
+    ctx.scale(game.viewport.screenScale, game.viewport.screenScale);
+    ctx.translate(-W/2, -H/2);
     
     game.draw(ctx);
     if(game.gameOver){
@@ -168,7 +173,7 @@ function handleStart(e) {
         return;
     }
     
-    game.ship.setThrust(e.clientX < W / 2 ? -1 : 1);
+    game.ship.setThrust(e.clientX < game.viewport.screenWidth / 2 ? -1 : 1);
 }
 
 function handleEnd(e) {
