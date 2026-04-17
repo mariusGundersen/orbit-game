@@ -1,7 +1,7 @@
 // @ts-check
 
 import Explosion from "./explosion.js";
-import { G, H, W, worldToScreen } from "./main.js";
+import { H, W, worldToScreen } from "./main.js";
 import Planet from "./planet.js";
 import { rand, reset } from "./random.js";
 import Ship from "./ship.js";
@@ -207,8 +207,8 @@ export default class Game {
       const ry = dy / currentDist;
 
       const h = dx * this.ship.vy - dy * this.ship.vx;
-      const eVecX = (this.ship.vy * h) / (G * body.mass) - rx;
-      const eVecY = (-this.ship.vx * h) / (G * body.mass) - ry;
+      const eVecX = (this.ship.vy * h) / (body.massG) - rx;
+      const eVecY = (-this.ship.vx * h) / (body.massG) - ry;
       const e = Math.sqrt(eVecX * eVecX + eVecY * eVecY);
 
       if (e >= 1) {

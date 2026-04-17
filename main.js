@@ -1,6 +1,5 @@
 import Game from './game.js';
 
-export const G = 800;
 
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
@@ -24,8 +23,6 @@ resize();
 window.addEventListener('resize', resize);
 
 let game = new Game();
-
-const AUTO_CIRCULARIZE = false;
 
 function drawBackground() {
     const stars = [];

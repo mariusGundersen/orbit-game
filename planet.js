@@ -1,9 +1,9 @@
 // @ts-check
 
-import { G } from "./main.js";
 import { rand } from "./random.js";
 
 export default class Planet {
+  static G = 800;
   static DENSITY = 80;
   static COLORS = [
     "#ff6b35",
@@ -16,27 +16,6 @@ export default class Planet {
     "#ffd166",
   ];
 
-  /**
-   * @param {number} x
-   * @param {number} y
-   * @param {number} mass
-   * @param {string} color
-   */
-
-  /*
-    
-
-    const radius = 35 + Math.random() * 30;
-    const mass = radius * 80;
-    */
-  constructor(x, y, mass = Planet.randomMass(), color = Planet.randomColor()) {
-    this.x = x;
-    this.y = y;
-    this.mass = mass;
-    this.radius = mass / Planet.DENSITY;
-    this.color = color;
-  }
-
   static randomColor() {
     return Planet.COLORS[Math.floor(rand() * Planet.COLORS.length)];
   }
@@ -45,20 +24,38 @@ export default class Planet {
     return (35 + rand() * 30) * Planet.DENSITY;
   }
 
-    /**
-     * @param {{ x: number; y: number; }} pos
-     */
-    calculateForceOnObject(pos) {
-      const dx = this.x - pos.x;
-      const dy = this.y - pos.y;
-      const distSq = dx * dx + dy * dy;
-      const dist = Math.sqrt(distSq);
-      const force = G * this.mass / distSq;
-      return { 
-        ax: force * dx / dist, 
-        ay: force * dy / dist, 
-        dist, 
-        force 
+  /**
+   * @param {number} x
+   * @param {number} y
+   * @param {number} mass
+   * @param {string} color
+   */
+  constructor(x, y, mass = Planet.randomMass(), color = Planet.randomColor()) {
+    this.x = x;
+    this.y = y;
+    this.mass = mass;
+    this.radius = mass / Planet.DENSITY;
+    this.color = color;
+  }
+
+  get massG() {
+    return Planet.G * this.mass;
+  }
+
+  /**
+   * @param {{ x: number; y: number; }} pos
+   */
+  calculateForceOnObject(pos) {
+    const dx = this.x - pos.x;
+    const dy = this.y - pos.y;
+    const distSq = dx * dx + dy * dy;
+    const dist = Math.sqrt(distSq);
+    const force = (Planet.G * this.mass) / distSq;
+    return {
+      ax: (force * dx) / dist,
+      ay: (force * dy) / dist,
+      dist,
+      force,
     };
   }
 
