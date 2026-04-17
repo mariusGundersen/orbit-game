@@ -2,6 +2,7 @@ import Explosion from './explosion.js';
 import Planet from './planet.js';
 import Ship from './ship.js';
 import {rand, reset} from './random.js';
+import Viewport from './viewport.js';
 
 
 const canvas = document.getElementById('game');
@@ -9,6 +10,8 @@ const ctx = canvas.getContext('2d');
 
 const bgCanvas = document.getElementById('background');
 const bgCtx = bgCanvas.getContext('2d');
+
+const viewport = new Viewport();
 
 export let W, H;
 function resize() {
@@ -76,12 +79,8 @@ function initShip(orbiting, target) {
 let level = 1;
 let time = 0;
 let gameOver = false;
-let zoomOutFactor = 1;
-let zoomOutTarget = 1;
-let zoomOutStart = 1;
 let levelDeltaVs = {};
 let highScores = [];
-let offsetX = 0;
 
 function loadHighScores() {
     const stored = localStorage.getItem('orbitHighScores');
@@ -98,13 +97,6 @@ function saveHighScore(lvl, dv) {
 }
 
 loadHighScores();
-let offsetY = 0;
-let sliding = false;
-let slideProgress = 0;
-let slideStartX = 0;
-let slideStartY = 0;
-let slideTargetX = 0;
-let slideTargetY = 0;
 let perigeePos = null;
 /**
  * @type {Explosion[]}
@@ -146,13 +138,8 @@ function transitionToNextLevel() {
     
     const slideOffsetX = oldOrbit.x - newOrbit.x;
     const slideOffsetY = oldOrbit.y - newOrbit.y;
-    
-    slideStartX = offsetX;
-    slideStartY = offsetY;
-    slideTargetX = offsetX + slideOffsetX;
-    slideTargetY = offsetY + slideOffsetY;
-    slideProgress = 0;
-    sliding = true;
+
+    viewport.slideBy(slideOffsetX, slideOffsetY);
     
     explosions.push(new Explosion(oldOrbit.x, oldOrbit.y, oldOrbit.color, oldOrbit.radius));
     
@@ -160,7 +147,6 @@ function transitionToNextLevel() {
     planets.push(newPlanet);
     ship.target = newPlanet;
     ship.orbiting = newOrbit;
-    sliding = true;
     
     levelDeltaVs[level] = ship.consumedDeltaV;
     saveHighScore(level, ship.consumedDeltaV);
@@ -175,8 +161,8 @@ function transitionToNextLevel() {
 export function transformScreen(cb){
     ctx.save();
     ctx.translate(W/2, H/2);
-    ctx.scale(zoomOutFactor, zoomOutFactor);
-    ctx.translate(offsetX - W / 2, offsetY - H / 2);
+    ctx.scale(viewport.zoom, viewport.zoom);
+    ctx.translate(viewport.x - W / 2, viewport.y - H / 2);
     cb();
     ctx.restore();
 }
@@ -185,8 +171,8 @@ export function worldToScreen(x, y) {
     const cx = W / 2;
     const cy = H / 2;
     return { 
-        x: cx + (x + offsetX - cx) * zoomOutFactor, 
-        y: cy + (y + offsetY - cy) * zoomOutFactor 
+        x: cx + (x + viewport.x - cx) * viewport.zoom, 
+        y: cy + (y + viewport.y - cy) * viewport.zoom 
     };
 }
 
@@ -218,35 +204,17 @@ function endGame(){
     const scaleX = W / contentW;
     const scaleY = H / contentH;
     const targetZoom = Math.min(scaleX, scaleY, 1);
-    
-    zoomOutTarget = Math.max(0.1, targetZoom);
-    
+        
     const contentCenterX = (contentMinX + contentMaxX) / 2;
     const contentCenterY = (contentMinY + contentMaxY) / 2;
-    slideStartX = offsetX;
-    slideStartY = offsetY;
-    slideTargetX = W/2 - contentCenterX;
-    slideTargetY = H/2 - contentCenterY;
-    slideProgress = 0;
-    sliding = true;
+
+    viewport.slideTo(W/2 - contentCenterX, H/2 - contentCenterY, targetZoom);
 }
 
 function update(dt) {
     updateExplosions(dt);
-    
-    if (sliding) {
-        slideProgress += dt;
-        if (slideProgress >= 1) {
-            slideProgress = 1;
-            sliding = false;
-        }
-        const t = slideProgress;
-        const ease = t * (2 - t);
-        offsetX = slideStartX + (slideTargetX - slideStartX) * ease;
-        offsetY = slideStartY + (slideTargetY - slideStartY) * ease;
-        zoomOutFactor = zoomOutStart + (zoomOutTarget - zoomOutStart) * ease;
-    }
-    
+    viewport.update(dt);
+        
     if (gameOver) {
         return;
     }
@@ -300,7 +268,7 @@ function update(dt) {
         transitionToNextLevel();
     } 
     
-    if (!gameOver && !sliding) {
+    if (!gameOver && !viewport.sliding) {
         const body = ship.orbiting;
         const dx = ship.x - body.x;
         const dy = ship.y - body.y;
@@ -463,18 +431,12 @@ function drawGameOver() {
 
 function resetGame() {
     reset(new Date().toDateString());
+    viewport.reset();
     initPlanets();
     initShip(planets.at(-2), planets.at(-1));
     level = 1;
     gameOver = false;
-    zoomOutFactor = 1;
-    zoomOutStart = 1;
-    zoomOutTarget = 1;
     levelDeltaVs = {};
-    offsetX = 0;
-    offsetY = 0;
-    sliding = false;
-    slideProgress = 0;
     perigeePos = null;
     explosions = [];
 }
@@ -529,7 +491,7 @@ function gameLoop(timestamp) {
 function handleStart(e) {
     e.preventDefault();
     if (gameOver) {
-        if(!sliding){
+        if(!viewport.sliding){
             resetGame();
         }
         return;
@@ -549,7 +511,7 @@ canvas.addEventListener('pointerleave', handleEnd);
 
 function handleKeyDown(e) {
     if (gameOver) {
-        if(!sliding){
+        if(!viewport.sliding){
             resetGame();
         }
         return;
