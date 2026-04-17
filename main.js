@@ -1,3 +1,4 @@
+import Explosion from './explosion.js';
 import Planet from './planet.js';
 import Ship from './ship.js';
 
@@ -121,56 +122,20 @@ let slideStartY = 0;
 let slideTargetX = 0;
 let slideTargetY = 0;
 let perigeePos = null;
+/**
+ * @type {Explosion[]}
+ */
 let explosions = [];
 
-function createExplosion(x, y, color, radius) {
-    const particles = [];
-    for (let i = 0; i < 50; i++) {
-        const angle = Math.random() * Math.PI * 2;
-        const speed = 100 + Math.random() * 200;
-        particles.push({
-            x: x + Math.cos(angle) * radius,
-            y: y + Math.sin(angle) * radius,
-            vx: Math.cos(angle) * speed,
-            vy: Math.sin(angle) * speed,
-            alpha: 1,
-            size: 3 + Math.random() * 6,
-            color: color
-        });
-    }
-    explosions.push({ particles, time: 0 });
-}
-
 function updateExplosions(dt) {
-    for (let i = explosions.length - 1; i >= 0; i--) {
-        const exp = explosions[i];
-        exp.time += dt;
-        
-        for (const p of exp.particles) {
-            p.x += p.vx * dt;
-            p.y += p.vy * dt;
-            p.vx *= 0.98;
-            p.vy *= 0.98;
-            p.alpha -= dt * 0.8;
-            p.size *= 0.99;
-        }
-        
-        if (exp.time > 1) {
-            explosions.splice(i, 1);
-        }
+    for(const explosion of explosions){
+        explosion.update(dt);
     }
 }
 
 function drawExplosions() {
-    for (const exp of explosions) {
-        for (const p of exp.particles) {
-            if (p.alpha <= 0) continue;
-            ctx.globalAlpha = p.alpha;
-            ctx.fillStyle = p.color;
-            ctx.beginPath();
-            ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-            ctx.fill();
-        }
+    for (const explosion of explosions) {
+        explosion.draw(ctx);
     }
     ctx.globalAlpha = 1;
 }
@@ -205,7 +170,7 @@ function transitionToNextLevel() {
     slideProgress = 0;
     sliding = true;
     
-    createExplosion(oldOrbit.x, oldOrbit.y, oldOrbit.color, oldOrbit.radius);
+    explosions.push(new Explosion(oldOrbit.x, oldOrbit.y, oldOrbit.color, oldOrbit.radius));
     
     const newPlanet = generateRandomPlanet(newOrbit.x, newOrbit.y);
     planets.push(newPlanet);
@@ -527,6 +492,7 @@ function resetGame() {
     sliding = false;
     slideProgress = 0;
     perigeePos = null;
+    explosions = [];
 }
 
 let lastTime = 0;
