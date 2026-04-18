@@ -173,7 +173,7 @@ function handleStart(e) {
         return;
     }
     
-    game.ship.setThrust(e.clientX < game.viewport.screenWidth / 2 ? -1 : 1);
+    game.ship.setThrust(e.clientX < game.viewport.screenWidth / 2 / devicePixelRatio ? -1 : 1);
 }
 
 function handleEnd(e) {
