@@ -15,12 +15,36 @@
             touch-action: none;
         }
         canvas,
-        svg {
+        svg,
+        #ui {
             display: block;
             width: 100%;
             height: 100%;
             grid-area: bg;
         }
+
+        #ui {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .bottom {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px;
+            font-family: "Courier New", monospace;
+            font-size: 16px;
+
+            .retro {
+                color: #ff6600;
+            }
+
+            .prograde {
+                color: #00ff88;
+            }
+        }
+
         body {
             display: grid;
             grid-template-areas: "bg";
@@ -47,6 +71,15 @@
             
         </svg>
         -->
+    <div id="ui">
+        <div class="top">
+            
+        </div>
+        <div class="bottom">
+            <span class="retro">◄ RETRO</span>
+            <span class="prograde">PROGRADE ►</span>
+        </div>
+    </div>
 <script src="main.js" type="module"></script>
 </body>
 </html>
