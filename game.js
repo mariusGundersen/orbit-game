@@ -1,7 +1,6 @@
 // @ts-check
 
 import Explosion from "./explosion.js";
-import { H, W } from "./main.js";
 import Planet from "./planet.js";
 import { rand, reset } from "./random.js";
 import Ship from "./ship.js";
@@ -13,8 +12,8 @@ export default class Game {
   gameOver = false;
   viewport = new Viewport();
   planets = [
-    new Planet(W * 0.5, H * 0.75, 5000, "#00e5ff"),
-    new Planet(W * 0.5, H * 0.25, 4500, "#ff6b35"),
+    new Planet(this.viewport.worldWidth * 0.5, this.viewport.worldHeight * 0.75, 5000, "#00e5ff"),
+    new Planet(this.viewport.worldWidth * 0.5, this.viewport.worldHeight * 0.25, 4500, "#ff6b35"),
   ];
   ship = new Ship(this.planets[0], this.planets[1]);
 
@@ -60,8 +59,8 @@ export default class Game {
     const t = Math.min(1, Math.max(0, (this.level - 1) / 9));
     const inline = 0.5 + (rand() - 0.5) * t;
     const block = 0.5 + (rand() - 0.5) * t * 0.5;
-    const x = W * inline;
-    const y = refY - H * block;
+    const x = this.viewport.worldWidth * inline;
+    const y = refY - this.viewport.worldHeight * block;
 
     return new Planet(x, y);
   }
@@ -121,16 +120,16 @@ export default class Game {
     const contentW = contentMaxX - contentMinX;
     const contentH = contentMaxY - contentMinY;
 
-    const scaleX = W / contentW;
-    const scaleY = H / contentH;
+    const scaleX = this.viewport.worldWidth / contentW;
+    const scaleY = this.viewport.worldHeight / contentH;
     const targetZoom = Math.min(scaleX, scaleY, 1);
 
     const contentCenterX = (contentMinX + contentMaxX) / 2;
     const contentCenterY = (contentMinY + contentMaxY) / 2;
 
     this.viewport.slideTo(
-      W / 2 - contentCenterX,
-      H / 2 - contentCenterY,
+      this.viewport.worldWidth / 2 - contentCenterX,
+      this.viewport.worldHeight / 2 - contentCenterY,
       targetZoom,
     );
   }
@@ -219,9 +218,9 @@ export default class Game {
         const screenPos = this.viewport.worldToScreen(this.ship.x, this.ship.y);
         if (
           screenPos.x < -100 ||
-          screenPos.x > W + 100 ||
+          screenPos.x > this.viewport.worldWidth + 100 ||
           screenPos.y < -100 ||
-          screenPos.y > H + 100
+          screenPos.y > this.viewport.worldHeight + 100
         ) {
           this.endGame();
         }
@@ -236,9 +235,9 @@ export default class Game {
      */
   transformScreen(ctx, cb) {
     ctx.save();
-    ctx.translate(W / 2, H / 2);
+    ctx.translate(this.viewport.worldWidth / 2, this.viewport.worldHeight / 2);
     ctx.scale(this.viewport.zoom, this.viewport.zoom);
-    ctx.translate(this.viewport.x - W / 2, this.viewport.y - H / 2);
+    ctx.translate(this.viewport.x - this.viewport.worldWidth / 2, this.viewport.y - this.viewport.worldHeight / 2);
     cb();
     ctx.restore();
   }
@@ -256,7 +255,21 @@ export default class Game {
     } else {
       this.transformScreen(ctx, () => {
         this.ship.drawOrbitPath(ctx);
-        if (this.level < 4) {
+        if (this.level === 1) {
+          ctx.strokeStyle = '#444';
+          ctx.lineWidth = 1;
+          ctx.setLineDash([4, 4]);
+          ctx.beginPath();
+          ctx.ellipse(240, 300, 275, 230, Math.PI / 2, 0, Math.PI * 2);
+          ctx.stroke();
+        } else if (this.level === 2) {
+          ctx.strokeStyle = '#444';
+          ctx.lineWidth = 1;
+          ctx.setLineDash([4, 4]);
+          ctx.beginPath();
+          ctx.arc(this.planets[1].x, this.planets[1].y, this.planets[1].radius*2, 0, Math.PI * 2);
+          ctx.stroke();
+        } else if (this.level < 4) {
           this.ship.drawSOIs(ctx);
         }
         this.planets.slice(-3).forEach(p => p.draw(ctx, this.time));

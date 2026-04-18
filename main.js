@@ -12,8 +12,6 @@ const bgCanvas = document.getElementById('background');
 const bgCtx = bgCanvas.getContext('2d');
 
 
-export const W = 420, H = 600;
-
 let game = new Game();
 
 function resize() {
@@ -77,35 +75,22 @@ function updateFuelGauge() {
     }
 }
 
-function drawUI() {        
-    
-    if (game.level === 1 ) {
-        ctx.font = '12px "Courier New", monospace';
-        ctx.fillStyle = '#aaaaaa';
-        ctx.globalAlpha = 0.7;
-        ctx.textAlign = 'center';
-        ctx.fillText('TAP LEFT TO BURN RETROGRADE', W / 2, H - 85);
-        ctx.fillText('TAP RIGHT TO BURN PROGRADE', W / 2, H - 70);
-        ctx.globalAlpha = 1;
-    }
-}
-
 function drawGameOver() {
     ctx.fillStyle = '#ff3535';
     ctx.font = 'bold 36px "Courier New", monospace';
     ctx.textAlign = 'center';
     ctx.shadowColor = '#ff3535';
     ctx.shadowBlur = 20;
-    ctx.fillText('GAME OVER', W / 2, 50);
+    ctx.fillText('GAME OVER', game.viewport.worldWidth / 2, 50);
     ctx.shadowBlur = 0;
     
     ctx.font = '16px "Courier New", monospace';
     ctx.fillStyle = '#ffffff';
-    ctx.fillText(`Highest Level: ${game.level}`, W / 2, 90);
+    ctx.fillText(`Highest Level: ${game.level}`, game.viewport.worldWidth / 2, 90);
         
     ctx.font = '14px "Courier New", monospace';
     ctx.fillStyle = '#666666';
-    ctx.fillText('Click to restart', W / 2, H - 30);
+    ctx.fillText('Click to restart', game.viewport.worldWidth / 2, game.viewport.worldHeight - 30);
 }
 
 function resetGame() {
@@ -123,13 +108,12 @@ function gameLoop(timestamp) {
     ctx.reset();
     ctx.translate(game.viewport.screenWidth/2, game.viewport.screenHeight/2);
     ctx.scale(game.viewport.screenScale, game.viewport.screenScale);
-    ctx.translate(-W/2, -H/2);
+    ctx.translate(-game.viewport.worldWidth/2, -game.viewport.worldHeight/2);
     
     game.draw(ctx);
     if(game.gameOver){
         drawGameOver();
     }else{
-        drawUI();
         updateFuelGauge();
     }
     

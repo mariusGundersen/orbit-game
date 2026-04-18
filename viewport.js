@@ -1,8 +1,8 @@
 // @ts-check
 
-import { H, W } from './main.js';
-
 export default class Viewport {
+  worldWidth = 480;
+  worldHeight = 600;
   x = 0;
   y = 0;
   progress = 1;
@@ -28,7 +28,7 @@ export default class Viewport {
   setScreenSize(w, h) {
     this.screenWidth = w;
     this.screenHeight = h;
-    this.screenScale = w / h < W / H ? w / W : h / H;
+    this.screenScale = w / h < this.worldWidth / this.worldHeight ? w / this.worldWidth : h / this.worldHeight;
   }
 
   reset() {
@@ -95,8 +95,8 @@ export default class Viewport {
    */
   worldToScreen(x, y) {
     return {
-      x: (x + this.x - W / 2) * this.zoom * this.screenScale + this.screenWidth / 2,
-      y: (y + this.y - H / 2) * this.zoom * this.screenScale + this.screenHeight / 2
+      x: (x + this.x - this.worldWidth / 2) * this.zoom * this.screenScale + this.screenWidth / 2,
+      y: (y + this.y - this.worldHeight / 2) * this.zoom * this.screenScale + this.screenHeight / 2
     };
   }
 
@@ -106,8 +106,8 @@ export default class Viewport {
    */
   screenToWorld(x, y) {
     return {
-      x: (x - this.screenWidth / 2) / (this.zoom * this.screenScale) - this.x + W / 2,
-      y: (y - this.screenHeight / 2) / (this.zoom * this.screenScale) - this.y + H / 2
+      x: (x - this.screenWidth / 2) / (this.zoom * this.screenScale) - this.x + this.worldWidth / 2,
+      y: (y - this.screenHeight / 2) / (this.zoom * this.screenScale) - this.y + this.worldHeight / 2
     };
   }
 }
