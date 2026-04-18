@@ -1,6 +1,5 @@
 // @ts-check
 
-import { H, W, worldToScreen } from "./main.js";
 import Planet from "./planet.js";
 
 const THRUST_POWER = 40;
@@ -148,77 +147,6 @@ export default class Ship {
       ctx.fill();
     }
     ctx.globalAlpha = 1;
-  }
-
-  /**
-   * @param {CanvasRenderingContext2D} ctx
-   */
-  drawPointer(ctx) {
-    const pos = worldToScreen(this.x, this.y);
-
-    const margin = 0;
-    let edgeX, edgeY;
-
-    if (pos.x < margin) {
-      edgeX = margin;
-      if (pos.y < margin) {
-        edgeY = margin;
-      } else if (pos.y > H - margin) {
-        edgeY = H - margin;
-      } else {
-        edgeY = pos.y;
-      }
-    } else if (pos.x > W - margin) {
-      edgeX = W - margin;
-      if (pos.y < margin) {
-        edgeY = margin;
-      } else if (pos.y > H - margin) {
-        edgeY = H - margin;
-      } else {
-        edgeY = pos.y;
-      }
-    } else if (pos.y < margin) {
-      edgeY = margin;
-      edgeX = pos.x;
-    } else if (pos.y > H - margin) {
-      edgeY = H - margin;
-      edgeX = pos.x;
-    } else {
-      return;
-    }
-
-    const planetPos = worldToScreen(this.orbiting.x, this.orbiting.y);
-
-    const cx = planetPos.x;
-    const cy = planetPos.y;
-
-    const pointerAngle = Math.atan2(edgeY - cy, edgeX - cx);
-
-    ctx.save();
-    ctx.translate(edgeX, edgeY);
-    ctx.rotate(pointerAngle);
-
-    ctx.fillStyle = "#ff6b35";
-    ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.lineTo(-16, -6);
-    ctx.lineTo(-16, 6);
-    ctx.closePath();
-    ctx.fill();
-
-    ctx.restore();
-
-    const dist = this.distanceToPlanet;
-
-    ctx.font = '12px "Courier New", monospace';
-    ctx.fillStyle = "#ff6b35";
-    ctx.textAlign = "center";
-    const { width } = ctx.measureText(`${Math.round(dist)}`);
-    ctx.fillText(
-      `${Math.round(dist)}`,
-      edgeX - Math.cos(pointerAngle) * (20 + width / 2),
-      edgeY - Math.sin(pointerAngle) * (20 + width / 2),
-    );
   }
 
   /**

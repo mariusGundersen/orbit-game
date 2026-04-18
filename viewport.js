@@ -28,7 +28,7 @@ export default class Viewport {
   setScreenSize(w, h) {
     this.screenWidth = w;
     this.screenHeight = h;
-    this.screenScale = w/h < W/H ? w/W : h/H;
+    this.screenScale = w / h < W / H ? w / W : h / H;
   }
 
   reset() {
@@ -87,5 +87,27 @@ export default class Viewport {
     this.x = this.prevX + (this.targetX - this.prevX) * ease;
     this.y = this.prevY + (this.targetY - this.prevY) * ease;
     this.zoom = this.prevZoom + (this.targetZoom - this.prevZoom) * ease;
+  }
+
+  /**
+   * @param {number} x
+   * @param {number} y
+   */
+  worldToScreen(x, y) {
+    return {
+      x: (x + this.x - W / 2) * this.zoom * this.screenScale + this.screenWidth / 2,
+      y: (y + this.y - H / 2) * this.zoom * this.screenScale + this.screenHeight / 2
+    };
+  }
+
+  /**
+   * @param {number} x
+   * @param {number} y
+   */
+  screenToWorld(x, y) {
+    return {
+      x: (x - this.screenWidth / 2) / (this.zoom * this.screenScale) - this.x + W / 2,
+      y: (y - this.screenHeight / 2) / (this.zoom * this.screenScale) - this.y + H / 2
+    };
   }
 }

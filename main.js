@@ -12,7 +12,7 @@ const bgCanvas = document.getElementById('background');
 const bgCtx = bgCanvas.getContext('2d');
 
 
-export let W = 420, H = 600;
+export const W = 420, H = 600;
 
 let game = new Game();
 
@@ -55,16 +55,6 @@ function drawBackground(width, height) {
     bgCtx.resetTransform();
 }
 
-export function worldToScreen(x, y) {
-    const cx = W / 2;
-    const cy = H / 2;
-    return { 
-        x: cx + (x + game.viewport.x - cx) * game.viewport.zoom, 
-        y: cy + (y + game.viewport.y - cy) * game.viewport.zoom 
-    };
-}
-
-
 const fuelGauge = document.getElementById('fuelGauge');
 const fuelText = document.getElementById('fuelText');
 
@@ -87,13 +77,7 @@ function updateFuelGauge() {
     }
 }
 
-function drawUI() { 
-    ctx.stroke();
-    ctx.textAlign = 'right';
-    ctx.fillText(`DV: ${Math.round(game.ship.fuel)}`, W - 20, 30);
-    ctx.fillText(`LEVEL ${game.level}`, W - 20, 50);
-    ctx.textAlign = 'left';
-        
+function drawUI() {        
     
     if (game.level === 1 ) {
         ctx.font = '12px "Courier New", monospace';

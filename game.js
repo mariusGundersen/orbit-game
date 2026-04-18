@@ -1,7 +1,7 @@
 // @ts-check
 
 import Explosion from "./explosion.js";
-import { H, W, worldToScreen } from "./main.js";
+import { H, W } from "./main.js";
 import Planet from "./planet.js";
 import { rand, reset } from "./random.js";
 import Ship from "./ship.js";
@@ -27,7 +27,7 @@ export default class Game {
   /**
      * @param {Viewport} [viewport]
      */
-  constructor(viewport = new Viewport()){
+  constructor(viewport = new Viewport()) {
     reset(new Date().toDateString());
     this.viewport = viewport;
     viewport.slideTo(0, 0, 1);
@@ -155,9 +155,9 @@ export default class Game {
       return;
     }
 
-    if(this.ship.fuel <= 0) {
-        this.endGame();
-        return;
+    if (this.ship.fuel <= 0) {
+      this.endGame();
+      return;
     }
 
 
@@ -216,7 +216,7 @@ export default class Game {
       const e = Math.sqrt(eVecX * eVecX + eVecY * eVecY);
 
       if (e >= 1) {
-        const screenPos = worldToScreen(this.ship.x, this.ship.y);
+        const screenPos = this.viewport.worldToScreen(this.ship.x, this.ship.y);
         if (
           screenPos.x < -100 ||
           screenPos.x > W + 100 ||
@@ -234,41 +234,115 @@ export default class Game {
      * @param {CanvasRenderingContext2D} ctx
      * @param {() => void} cb
      */
-  transformScreen(ctx, cb){
-      ctx.save();
-      ctx.translate(W/2, H/2);
-      ctx.scale(this.viewport.zoom, this.viewport.zoom);
-      ctx.translate(this.viewport.x - W / 2, this.viewport.y - H / 2);
-      cb();
-      ctx.restore();
+  transformScreen(ctx, cb) {
+    ctx.save();
+    ctx.translate(W / 2, H / 2);
+    ctx.scale(this.viewport.zoom, this.viewport.zoom);
+    ctx.translate(this.viewport.x - W / 2, this.viewport.y - H / 2);
+    cb();
+    ctx.restore();
   }
 
   /**
      * @param {CanvasRenderingContext2D} ctx
      */
-  draw(ctx){
-        if(this.gameOver){
-            this.transformScreen(ctx, () => {
-                this.planets.forEach(p => p.draw(ctx, this.time));
-                this.ship.draw(ctx);
-                this.ship.drawTrail(ctx, Infinity);
-            });
-        }else{
-            this.transformScreen(ctx, () => {
-                this.ship.drawOrbitPath(ctx);
-                if(this.level < 4){
-                    this.ship.drawSOIs(ctx);
-                }
-                this.planets.slice(-3).forEach(p => p.draw(ctx, this.time));
-                this.ship.drawTrail(ctx);
-                this.ship.draw(ctx);
-                this.drawExplosions(ctx);
-                /*
-                drawPerigee();
-                */
-            });
-            this.ship.drawPointer(ctx);
+  draw(ctx) {
+    if (this.gameOver) {
+      this.transformScreen(ctx, () => {
+        this.planets.forEach(p => p.draw(ctx, this.time));
+        this.ship.draw(ctx);
+        this.ship.drawTrail(ctx, Infinity);
+      });
+    } else {
+      this.transformScreen(ctx, () => {
+        this.ship.drawOrbitPath(ctx);
+        if (this.level < 4) {
+          this.ship.drawSOIs(ctx);
         }
+        this.planets.slice(-3).forEach(p => p.draw(ctx, this.time));
+        this.ship.drawTrail(ctx);
+        this.ship.draw(ctx);
+        this.drawExplosions(ctx);
+        /*
+        drawPerigee();
+        */
+        this.drawPointerToShip(ctx);
+      });
+    }
+  }
+
+  /**
+   * @param {CanvasRenderingContext2D} ctx
+   */
+  drawPointerToShip(ctx) {
+    const pos = this.viewport.worldToScreen(this.ship.x, this.ship.y);
+
+    const W = this.viewport.screenWidth;
+    const H = this.viewport.screenHeight;
+
+    const margin = 0;
+    let edgeX, edgeY;
+
+    if (pos.x < margin) {
+      edgeX = margin;
+      if (pos.y < margin) {
+        edgeY = margin;
+      } else if (pos.y > H - margin) {
+        edgeY = H - margin;
+      } else {
+        edgeY = pos.y;
+      }
+    } else if (pos.x > W - margin) {
+      edgeX = W - margin;
+      if (pos.y < margin) {
+        edgeY = margin;
+      } else if (pos.y > H - margin) {
+        edgeY = H - margin;
+      } else {
+        edgeY = pos.y;
+      }
+    } else if (pos.y < margin) {
+      edgeY = margin;
+      edgeX = pos.x;
+    } else if (pos.y > H - margin) {
+      edgeY = H - margin;
+      edgeX = pos.x;
+    } else {
+      return;
+    }
+
+    const pointerPos = this.viewport.screenToWorld(edgeX, edgeY);
+
+    const pointerAngle = Math.atan2(pointerPos.y - this.ship.orbiting.y, pointerPos.x - this.ship.orbiting.x);
+
+    const dist = Math.sqrt(
+      Math.pow(this.ship.x - pointerPos.x, 2) +
+      Math.pow(this.ship.y - pointerPos.y, 2)
+    );
+
+    ctx.save();
+    ctx.translate(pointerPos.x, pointerPos.y);
+    ctx.rotate(pointerAngle);
+
+    ctx.fillStyle = "#ff6b35";
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(-16, -6);
+    ctx.lineTo(-16, 6);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.restore();
+
+    ctx.font = '12px "Courier New", monospace';
+    ctx.fillStyle = "#ff6b35";
+    ctx.textAlign = "center";
+    const { width } = ctx.measureText(`${Math.round(dist)}`);
+    ctx.fillText(
+      `${Math.round(dist)}`,
+      pointerPos.x - Math.cos(pointerAngle) * (20 + width / 2),
+      pointerPos.y - Math.sin(pointerAngle) * (20 + width / 2),
+    );
   }
 }
 
