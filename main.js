@@ -65,6 +65,28 @@ export function worldToScreen(x, y) {
 }
 
 
+const fuelGauge = document.getElementById('fuelGauge');
+const fuelText = document.getElementById('fuelText');
+
+function updateFuelGauge() {
+    if (fuelGauge && fuelText) {
+        const fuelPct = Math.max(0, Math.min(1, game.ship.fuel / 1000));
+        const levelHeight = 26 * fuelPct;
+        const level = fuelGauge.querySelector('.fuel-level');
+        if (level) {
+            level.setAttribute('y', 36 - levelHeight);
+            level.setAttribute('height', levelHeight);
+        }
+        fuelText.textContent = Math.round(game.ship.fuel);
+        
+        if (fuelPct < 0.25) {
+            fuelGauge.classList.add('low');
+        } else {
+            fuelGauge.classList.remove('low');
+        }
+    }
+}
+
 function drawUI() { 
     ctx.stroke();
     ctx.textAlign = 'right';
@@ -124,6 +146,7 @@ function gameLoop(timestamp) {
         drawGameOver();
     }else{
         drawUI();
+        updateFuelGauge();
     }
     
     

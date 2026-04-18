@@ -30,6 +30,45 @@
             pointer-events: none;
         }
 
+        .top {
+            display: flex;
+            justify-content: flex-end;
+            padding: 10px;
+        }
+
+        .fuel-gauge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-family: "Courier New", monospace;
+            font-size: 14px;
+            color: #ffaa00;
+        }
+
+        .fuel-icon {
+            width: 30px;
+            height: 40px;
+            position: relative;
+        }
+
+        .fuel-icon svg {
+            width: 100%;
+            height: 100%;
+        }
+
+        .fuel-level {
+            fill: #ffaa00;
+            transition: height 0.1s ease-out;
+        }
+
+        .fuel-gauge.low .fuel-level {
+            fill: #ff3333;
+        }
+
+        .fuel-gauge.low {
+            color: #ff3333;
+        }
+
         .bottom {
             display: flex;
             justify-content: space-between;
@@ -74,7 +113,16 @@
         -->
     <div id="ui">
         <div class="top">
-
+            <div class="fuel-gauge" id="fuelGauge">
+                <div class="fuel-icon">
+                    <svg viewBox="0 0 30 40">
+                        <path d="M15 2 L25 8 L25 32 Q25 38 15 38 Q5 38 5 32 L5 8 Z" fill="none" stroke="#ffaa00" stroke-width="2"/>
+                        <rect class="fuel-level" x="7" y="10" width="16" height="26" rx="1"/>
+                        <rect x="10" y="0" width="10" height="4" fill="#ffaa00" rx="1"/>
+                    </svg>
+                </div>
+                <span id="fuelText">1000</span>
+            </div>
         </div>
         <div class="bottom">
             <span class="retro">◄ RETRO</span>
