@@ -29,9 +29,6 @@ export default class Game {
     reset(new Date().toDateString());
     this.viewport = viewport;
     viewport.slideTo(0, 0, 1);
-
-    //this.planets[0].addSatellite(this.planets[0].radius * 2, Math.PI, 0);
-    this.planets[1].addSatellite(this.planets[1].radius * 2, Math.PI / 2, 0);
   }
 
   /**
@@ -87,6 +84,10 @@ export default class Game {
       levelDeltaVs[this.level] = this.ship.consumedDeltaV;
       saveHighScore(this.level, this.ship.consumedDeltaV);
       */
+
+    if (this.level === 1) {
+      this.planets[1].addSatellite(this.planets[1].radius * 2, Math.PI / 2, 0);
+    }
 
     this.level++;
 
@@ -145,7 +146,7 @@ export default class Game {
     this.viewport.update(dt);
 
     this.ship.orbiting.updateSatellites(dt);
-    this.ship.target?.updateSatellites(dt); 
+    this.ship.target?.updateSatellites(dt);
 
     if (this.gameOver) {
       return;
@@ -244,9 +245,9 @@ export default class Game {
         const screenPos = this.viewport.worldToScreen(this.ship.x, this.ship.y);
         if (
           screenPos.x < -100 ||
-          screenPos.x > this.viewport.worldWidth + 100 ||
+          screenPos.x > this.viewport.screenWidth + 100 ||
           screenPos.y < -100 ||
-          screenPos.y > this.viewport.worldHeight + 100
+          screenPos.y > this.viewport.screenHeight + 100
         ) {
           this.endGame();
         }
@@ -254,56 +255,62 @@ export default class Game {
     }
   }
 
-
   /**
-     * @param {CanvasRenderingContext2D} ctx
-     * @param {() => void} cb
-     */
-  transformScreen(ctx, cb) {
-    ctx.save();
-    ctx.translate(this.viewport.worldWidth / 2, this.viewport.worldHeight / 2);
-    ctx.scale(this.viewport.zoom, this.viewport.zoom);
-    ctx.translate(this.viewport.x - this.viewport.worldWidth / 2, this.viewport.y - this.viewport.worldHeight / 2);
-    cb();
-    ctx.restore();
+   * @param {CanvasRenderingContext2D} ctx
+   */
+  drawLevelHints(ctx) {
+    if (this.level === 1) {
+      ctx.strokeStyle = '#666';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath();
+      ctx.ellipse(240, 300, 275, 230, Math.PI / 2, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.strokeStyle = '#fff';
+      ctx.beginPath();
+      ctx.arc(240, 575, 10, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.fillStyle = "#fff";
+      ctx.textAlign = "center";
+      ctx.font = "14px 'Courier New', Courier, monospace";
+      ctx.fillText("Burn prograde to raise your orbit", 240, 595);
+    } else if (this.level === 2 && !this.ship.orbiting.allSatellitesVisited()) {
+      const planet = this.planets[1];
+      ctx.strokeStyle = '#666';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath();
+      ctx.arc(planet.x, planet.y, planet.radius * 2, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.strokeStyle = '#fff';
+      ctx.beginPath();
+      ctx.arc(planet.x, planet.y - planet.radius * 2, 10, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.fillStyle = "#fff";
+      ctx.textAlign = "center";
+      ctx.font = "14px 'Courier New', Courier, monospace";
+      ctx.fillText("Burn retrograde to lower your orbit", planet.x, planet.y - planet.radius * 2 - 20);
+    }
   }
 
   /**
      * @param {CanvasRenderingContext2D} ctx
      */
   draw(ctx) {
-    if (this.gameOver) {
-      this.transformScreen(ctx, () => {
+    this.viewport.transformCanvas(ctx);
+    this.viewport.transformScreen(ctx, () => {
+      if (this.gameOver) {
         this.planets.forEach(p => {
           p.draw(ctx, this.time);
-          p.drawSatellites(ctx);
         });
         this.ship.draw(ctx);
         this.ship.drawTrail(ctx, Infinity);
-      });
-    } else {
-      this.transformScreen(ctx, () => {
+      } else {
+        this.drawLevelHints(ctx);
         this.ship.drawOrbitPath(ctx);
-        if (this.level === 1) {
-          ctx.strokeStyle = '#444';
-          ctx.lineWidth = 1;
-          ctx.setLineDash([4, 4]);
-          ctx.beginPath();
-          ctx.ellipse(240, 300, 275, 230, Math.PI / 2, 0, Math.PI * 2);
-          ctx.stroke();
-        } else if (this.level === 2) {
-          ctx.strokeStyle = '#444';
-          ctx.lineWidth = 1;
-          ctx.setLineDash([4, 4]);
-          ctx.beginPath();
-          ctx.arc(this.planets[1].x, this.planets[1].y, this.planets[1].radius * 2, 0, Math.PI * 2);
-          ctx.stroke();
-        } else if (this.level < 4) {
-          this.ship.drawSOIs(ctx);
-        }
+        //this.ship.drawSOIs(ctx);
         this.planets.slice(-3).forEach(p => {
           p.draw(ctx, this.time);
-          p.drawSatellites(ctx);
         });
         this.ship.drawTrail(ctx);
         this.ship.draw(ctx);
@@ -312,8 +319,8 @@ export default class Game {
         drawPerigee();
         */
         this.drawPointerToShip(ctx);
-      });
-    }
+      }
+    });
   }
 
   /**

@@ -90,6 +90,30 @@ export default class Viewport {
   }
 
   /**
+   * @param {CanvasRenderingContext2D} ctx
+   */
+  transformCanvas(ctx) {
+    ctx.reset();
+    ctx.translate(this.screenWidth/2, this.screenHeight/2);
+    ctx.scale(this.screenScale, this.screenScale);
+    ctx.translate(-this.worldWidth/2, -this.worldHeight/2);
+  }
+  
+
+  /**
+     * @param {CanvasRenderingContext2D} ctx
+     * @param {() => void} cb
+     */
+  transformScreen(ctx, cb) {
+    ctx.save();
+    ctx.translate(this.worldWidth / 2, this.worldHeight / 2);
+    ctx.scale(this.zoom, this.zoom);
+    ctx.translate(this.x - this.worldWidth / 2, this.y - this.worldHeight / 2);
+    cb();
+    ctx.restore();
+  }
+
+  /**
    * @param {number} x
    * @param {number} y
    */

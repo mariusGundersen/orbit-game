@@ -167,5 +167,7 @@ export default class Planet {
     ctx.arc(this.x, this.y, this.radius * 2, 0, Math.PI * 2);
     ctx.fill();
     ctx.globalAlpha = 1;
+
+    this.drawSatellites(ctx);
   }
 }

@@ -101,11 +101,6 @@ function gameLoop(timestamp) {
     lastTime = timestamp;
     stats.begin();
     game.update(dt);
-
-    ctx.reset();
-    ctx.translate(game.viewport.screenWidth/2, game.viewport.screenHeight/2);
-    ctx.scale(game.viewport.screenScale, game.viewport.screenScale);
-    ctx.translate(-game.viewport.worldWidth/2, -game.viewport.worldHeight/2);
     
     game.draw(ctx);
     if(game.gameOver){
