@@ -8,7 +8,7 @@
         * { margin: 0; padding: 0; box-sizing: border-box; }
         html, body {
             width: 100dvw;
-            height: 100svh;
+            height: 100dvh;
 
             overflow: hidden;
             background: #0a0a12;
@@ -25,6 +25,7 @@
             height: 100%;
             grid-area: bg;
             touch-action: none;
+            font-family: 'Courier New', Courier, monospace;
         }
 
         #ui {
@@ -44,7 +45,6 @@
             display: flex;
             align-items: center;
             gap: 8px;
-            font-family: "Courier New", monospace;
             font-size: 14px;
             color: #ffaa00;
         }
@@ -77,16 +77,15 @@
             display: flex;
             justify-content: space-between;
             padding: 10px;
-            font-family: "Courier New", monospace;
             font-size: 16px;
+        }
 
-            .retro {
-                color: #ff6600;
-            }
+        .retro {
+            color: #ff6600;
+        }
 
-            .prograde {
-                color: #00ff88;
-            }
+        .prograde {
+            color: #00ff88;
         }
 
         #gameOver {
@@ -107,7 +106,6 @@
         }
 
         #gameOver h1 {
-            font-family: "Courier New", monospace;
             font-size: 36px;
             font-weight: bold;
             color: #ff3535;
@@ -116,14 +114,12 @@
         }
 
         #gameOver .level {
-            font-family: "Courier New", monospace;
             font-size: 16px;
             color: #ffffff;
             margin-bottom: 40px;
         }
 
         #gameOver .restart {
-            font-family: "Courier New", monospace;
             font-size: 14px;
             color: #ccc;
         }
