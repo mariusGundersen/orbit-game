@@ -1,6 +1,8 @@
 // @ts-check
 
 import { rand } from "./random.js";
+import Satellite from "./satellite.js";
+import { generateArray } from './utils.js';
 
 export default class Planet {
   static G = 800;
@@ -25,6 +27,11 @@ export default class Planet {
   }
 
   /**
+   * @type {Satellite[]}
+   */
+  satellites = [];
+
+  /**
    * @param {number} x
    * @param {number} y
    * @param {number} mass
@@ -36,6 +43,43 @@ export default class Planet {
     this.mass = mass;
     this.radius = mass / Planet.DENSITY;
     this.color = color;
+  }
+
+  /**
+   * @param {number} distance
+   */
+  addSatellite(distance, angle = rand() * Math.PI * 2, orbitSpeed = rand() - 0.5) {
+    const satellite = new Satellite(this, distance, angle, orbitSpeed);
+    this.satellites.push(satellite);
+  }
+
+  /**
+   * @param {number} level
+   */
+  generateSatellites(level) {
+    const t = Math.min(1, Math.max(0, (level - 1) / 9));
+    const count = level <= 3 ? 1 : level <= 6 ? 2 : level <= 9 ? 3 : 1 + Math.floor(rand() * 4);
+    const canOrbit = level >= 10;
+    const speed = canOrbit ? (rand() - 0.5) : 0;
+
+    const distance = this.radius * (2 - rand() * 0.5 * t);
+    const angleOffset = rand() * Math.PI * 2;
+
+    this.satellites = generateArray(count, i => new Satellite(this, distance, ((Math.PI * 2 / count) * i + angleOffset), speed));
+  }
+
+  /**
+   * @returns {boolean}
+   */
+  allSatellitesVisited() {
+    return this.satellites.every(s => s.visited);
+  }
+
+  /**
+   * @returns {boolean}
+   */
+  hasUnvisitedSatellites() {
+    return this.satellites.some(s => !s.visited);
   }
 
   get massG() {
@@ -57,6 +101,24 @@ export default class Planet {
       dist,
       force,
     };
+  }
+
+  /**
+   * @param {number} dt
+   */
+  updateSatellites(dt) {
+    for (const satellite of this.satellites) {
+      satellite.update(dt);
+    }
+  }
+
+  /**
+   * @param {CanvasRenderingContext2D} ctx
+   */
+  drawSatellites(ctx) {
+    for (const satellite of this.satellites) {
+      satellite.draw(ctx);
+    }
   }
 
   /**

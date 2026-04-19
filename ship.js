@@ -2,7 +2,7 @@
 
 import Planet from "./planet.js";
 
-const THRUST_POWER = 40;
+const THRUST_POWER = 20;
 const MAX_TRAIL_AGE = 1000;
 const TRAIL_PERIODICITY = 3;
 
@@ -12,6 +12,7 @@ export default class Ship {
   vx = 0;
   vy = 0;
   orbiting;
+  /** @type {Planet | undefined} */
   target;
   /** @type {{x: number, y: number, time: number}[]} */
   trail = [];
@@ -21,7 +22,7 @@ export default class Ship {
 
   /**
    * @param {Planet} orbiting
-   * @param {Planet} target
+   * @param {Planet} [target]
    */
   constructor(orbiting, target) {
     this.target = target;
@@ -155,6 +156,8 @@ export default class Ship {
   drawSOIs(ctx) {
     const p1 = this.orbiting;
     const p2 = this.target;
+
+    if(!p2) return;
 
     const dx = p1.x - p2.x;
     const dy = p1.y - p2.y;

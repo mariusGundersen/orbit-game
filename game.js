@@ -15,13 +15,12 @@ export default class Game {
     new Planet(this.viewport.worldWidth * 0.5, this.viewport.worldHeight * 0.75, 5000, "#00e5ff"),
     new Planet(this.viewport.worldWidth * 0.5, this.viewport.worldHeight * 0.25, 4500, "#ff6b35"),
   ];
-  ship = new Ship(this.planets[0], this.planets[1]);
+  ship = new Ship(this.planets[0]);
 
   /**
    * @type {Explosion[]}
    */
   explosions = [];
-
 
   /**
      * @param {Viewport} [viewport]
@@ -30,6 +29,9 @@ export default class Game {
     reset(new Date().toDateString());
     this.viewport = viewport;
     viewport.slideTo(0, 0, 1);
+
+    //this.planets[0].addSatellite(this.planets[0].radius * 2, Math.PI, 0);
+    this.planets[1].addSatellite(this.planets[1].radius * 2, Math.PI / 2, 0);
   }
 
   /**
@@ -57,9 +59,9 @@ export default class Game {
    */
   generateRandomPlanet(refX, refY) {
     const t = Math.min(1, Math.max(0, (this.level - 1) / 9));
-    const inline = 0.5 + (rand() - 0.5) * t;
+    const inline = (rand() - 0.5) * t;
     const block = 0.5 + (rand() - 0.5) * t * 0.5;
-    const x = this.viewport.worldWidth * inline;
+    const x = refX + this.viewport.worldWidth * inline;
     const y = refY - this.viewport.worldHeight * block;
 
     return new Planet(x, y);
@@ -68,6 +70,7 @@ export default class Game {
   transitionToNextLevel() {
     const oldOrbit = this.ship.orbiting;
     const newOrbit = this.ship.target;
+    if (!newOrbit) return;
 
     this.viewport.slideBy(oldOrbit.x - newOrbit.x, oldOrbit.y - newOrbit.y);
 
@@ -76,8 +79,8 @@ export default class Game {
     );
 
     const newTarget = this.generateRandomPlanet(newOrbit.x, newOrbit.y);
+    newTarget.generateSatellites(this.level + 1);
     this.planets.push(newTarget);
-    this.ship.target = newTarget;
     this.ship.orbiting = newOrbit;
 
     /*
@@ -141,6 +144,9 @@ export default class Game {
     this.updateExplosions(dt);
     this.viewport.update(dt);
 
+    this.ship.orbiting.updateSatellites(dt);
+    this.ship.target?.updateSatellites(dt); 
+
     if (this.gameOver) {
       return;
     }
@@ -186,15 +192,35 @@ export default class Game {
       }
     */
 
+
+    const orbitingPlanet = this.ship.orbiting;
+
+    for (const satellite of orbitingPlanet.satellites) {
+      if (satellite.checkCollision(this.ship)) {
+        satellite.visit();
+        this.explosions.push(
+          new Explosion(satellite.x, satellite.y, "#ffd700", 8),
+        );
+      }
+    }
+
+    if (orbitingPlanet.allSatellitesVisited()) {
+      this.ship.target = this.planets.at(-1);
+    }
+
     const grav = this.ship.orbiting.calculateForceOnObject(this.ship);
-    const targetGrav = this.ship.target.calculateForceOnObject(this.ship);
+
 
     if (grav.dist < this.ship.orbiting.radius) {
       this.endGame();
-      return;
-    } else if (targetGrav.force > grav.force) {
-      this.transitionToNextLevel();
-      this.ship.update(dt, targetGrav);
+    } else if (this.ship.target) {
+      const targetGrav = this.ship.target.calculateForceOnObject(this.ship);
+      if (targetGrav.force > grav.force) {
+        this.transitionToNextLevel();
+        this.ship.update(dt, targetGrav);
+      } else {
+        this.ship.update(dt, grav);
+      }
     } else {
       this.ship.update(dt, grav);
     }
@@ -248,7 +274,10 @@ export default class Game {
   draw(ctx) {
     if (this.gameOver) {
       this.transformScreen(ctx, () => {
-        this.planets.forEach(p => p.draw(ctx, this.time));
+        this.planets.forEach(p => {
+          p.draw(ctx, this.time);
+          p.drawSatellites(ctx);
+        });
         this.ship.draw(ctx);
         this.ship.drawTrail(ctx, Infinity);
       });
@@ -267,12 +296,15 @@ export default class Game {
           ctx.lineWidth = 1;
           ctx.setLineDash([4, 4]);
           ctx.beginPath();
-          ctx.arc(this.planets[1].x, this.planets[1].y, this.planets[1].radius*2, 0, Math.PI * 2);
+          ctx.arc(this.planets[1].x, this.planets[1].y, this.planets[1].radius * 2, 0, Math.PI * 2);
           ctx.stroke();
         } else if (this.level < 4) {
           this.ship.drawSOIs(ctx);
         }
-        this.planets.slice(-3).forEach(p => p.draw(ctx, this.time));
+        this.planets.slice(-3).forEach(p => {
+          p.draw(ctx, this.time);
+          p.drawSatellites(ctx);
+        });
         this.ship.drawTrail(ctx);
         this.ship.draw(ctx);
         this.drawExplosions(ctx);
