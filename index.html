@@ -85,6 +85,45 @@
             }
         }
 
+        #gameOver {
+            place-self: center;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+            padding: 40px;
+            border-radius: 20px;
+            background-color: #0a0a12cc;
+            box-shadow: 0 0 50px #0a0a12;
+        }
+
+        #gameOver.visible {
+            display: flex;
+        }
+
+        #gameOver h1 {
+            font-family: "Courier New", monospace;
+            font-size: 36px;
+            font-weight: bold;
+            color: #ff3535;
+            text-shadow: 0 0 20px #ff3535;
+            margin-bottom: 20px;
+        }
+
+        #gameOver .level {
+            font-family: "Courier New", monospace;
+            font-size: 16px;
+            color: #ffffff;
+            margin-bottom: 40px;
+        }
+
+        #gameOver .restart {
+            font-family: "Courier New", monospace;
+            font-size: 14px;
+            color: #ccc;
+        }
+
         body {
             display: grid;
             grid-template-areas: "bg";
@@ -123,6 +162,11 @@
                 </div>
                 <span id="fuelText">1000</span>
             </div>
+        </div>
+        <div id="gameOver">
+            <h1>GAME OVER</h1>
+            <p class="level">Highest Level: <span id="highestLevel"></span></p>
+            <p class="restart">Click to restart</p>
         </div>
         <div class="bottom">
             <span class="retro">◄ RETRO</span>

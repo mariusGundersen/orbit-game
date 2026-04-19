@@ -75,26 +75,23 @@ function updateFuelGauge() {
     }
 }
 
-function drawGameOver() {
-    ctx.fillStyle = '#ff3535';
-    ctx.font = 'bold 36px "Courier New", monospace';
-    ctx.textAlign = 'center';
-    ctx.shadowColor = '#ff3535';
-    ctx.shadowBlur = 20;
-    ctx.fillText('GAME OVER', game.viewport.worldWidth / 2, 50);
-    ctx.shadowBlur = 0;
-    
-    ctx.font = '16px "Courier New", monospace';
-    ctx.fillStyle = '#ffffff';
-    ctx.fillText(`Highest Level: ${game.level}`, game.viewport.worldWidth / 2, 90);
-        
-    ctx.font = '14px "Courier New", monospace';
-    ctx.fillStyle = '#666666';
-    ctx.fillText('Click to restart', game.viewport.worldWidth / 2, game.viewport.worldHeight - 30);
+const gameOverEl = document.getElementById('gameOver');
+const highestLevelEl = document.getElementById('highestLevel');
+let lastGameOverState = false;
+
+function updateGameOver() {
+    if (game.gameOver && !lastGameOverState) {
+        highestLevelEl.textContent = game.level;
+        gameOverEl.classList.add('visible');
+    } else if (!game.gameOver && lastGameOverState) {
+        gameOverEl.classList.remove('visible');
+    }
+    lastGameOverState = game.gameOver;
 }
 
 function resetGame() {
     game = new Game(game.viewport);
+    updateGameOver();
 }
 
 let lastTime = 0;
@@ -112,7 +109,7 @@ function gameLoop(timestamp) {
     
     game.draw(ctx);
     if(game.gameOver){
-        drawGameOver();
+        updateGameOver();
     }else{
         updateFuelGauge();
     }
