@@ -33,6 +33,8 @@
             flex-direction: column;
             justify-content: space-between;
             pointer-events: none;
+            /* This is needed for iOS Safari 26 */
+            z-index: 1;
         }
 
         .top {
@@ -153,6 +155,7 @@
     <div id="ui">
         <div class="top">
             <div class="fuel-gauge" id="fuelGauge">
+                <span id="fuelText">1000</span>
                 <div class="fuel-icon">
                     <svg viewBox="0 0 30 40">
                         <path d="M15 2 L25 8 L25 32 Q25 38 15 38 Q5 38 5 32 L5 8 Z" fill="none" stroke="#ffaa00" stroke-width="2"/>
@@ -160,7 +163,6 @@
                         <rect x="10" y="0" width="10" height="4" fill="#ffaa00" rx="1"/>
                     </svg>
                 </div>
-                <span id="fuelText">1000</span>
             </div>
         </div>
         <div id="gameOver">
